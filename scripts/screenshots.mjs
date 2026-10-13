@@ -137,6 +137,9 @@ try {
   await page.click(".side-scroll >> text=Web Vimmi"); // move focus off the input
   await page.locator(".tab-pane:not([hidden]) .note-head").click();
   await shot("editor-ai");
+  await setTheme("dark");
+  await shot("editor-ai-dark");
+  await setTheme("light");
 
   // 2) Today
   await page.keyboard.press("Control+j");

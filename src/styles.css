@@ -778,6 +778,41 @@ textarea {
   color: var(--accent-text);
   cursor: pointer;
 }
+.cm-properties {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 6px 18px;
+  padding: 10px 14px;
+  margin: 2px 0 10px;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-m);
+  background: var(--surface-2);
+  font-size: 0.86em;
+  cursor: text;
+}
+.cm-prop {
+  display: contents;
+}
+.cm-prop-key {
+  color: var(--text-3);
+}
+.cm-prop-value {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  color: var(--text);
+}
+.cm-prop-tag {
+  color: var(--accent-text);
+  background: var(--accent-soft);
+  border-radius: 4px;
+  padding: 0 5px;
+}
+.cm-prop-pill {
+  background: var(--surface-hover);
+  border-radius: 999px;
+  padding: 0 8px;
+}
 .cm-due-chip {
   font-size: 0.78em;
   padding: 1px 7px;

@@ -6,7 +6,7 @@ import { yamlFrontmatter } from "@codemirror/lang-yaml";
 import { HighlightStyle, syntaxHighlighting, syntaxTree } from "@codemirror/language";
 import { languages } from "@codemirror/language-data";
 import { highlightSelectionMatches, search, searchKeymap } from "@codemirror/search";
-import { Compartment, EditorSelection, EditorState, type Range, RangeSetBuilder } from "@codemirror/state";
+import { Compartment, EditorSelection, EditorState, type Range, RangeSetBuilder, StateField } from "@codemirror/state";
 import {
   Decoration,
   type DecorationSet,
@@ -249,6 +249,7 @@ function buildLivePreview(view: EditorView): DecorationSet {
     // Wikilinks: show only the label. Task metadata (@date, !priority, ✅ date) becomes small chips.
     const today = todayIso();
     const year = today.slice(0, 4);
+    const fmEnd = frontmatterEnd(view.state);
     for (let pos = from; pos <= to; ) {
       const line = doc.lineAt(pos);
       if (!active.has(line.number) && /^\s*[-*+] \[[ xX]\] /.test(line.text)) {
@@ -268,7 +269,7 @@ function buildLivePreview(view: EditorView): DecorationSet {
           out.push(Decoration.replace({ widget: new ChipWidget("✓", "cm-done-chip", `Splněno ${m[1]}`) }).range(start, start + m[0].length));
         }
       }
-      if (!active.has(line.number)) {
+      if (!active.has(line.number) && line.from > fmEnd) {
         const plain = line.text.replace(/`[^`]*`/g, (m) => " ".repeat(m.length));
         for (const m of plain.matchAll(/(!?)\[\[([^\]|\n]+?)(\|[^\]\n]*)?\]\]/g)) {
           if (m[1]) continue; // keep embeds visible
@@ -284,6 +285,86 @@ function buildLivePreview(view: EditorView): DecorationSet {
   }
   return Decoration.set(out, true);
 }
+
+// Frontmatter shown as a tidy properties block (like Obsidian) until the cursor enters it.
+const FRONTMATTER_RE = /^---\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/;
+
+function frontmatterEnd(state: EditorState): number {
+  const m = state.doc.sliceString(0, Math.min(state.doc.length, 8000)).match(FRONTMATTER_RE);
+  if (!m) return -1;
+  return m[0].endsWith("\n") ? m[0].length - 1 : m[0].length;
+}
+
+function parseProperties(yaml: string): [string, string][] {
+  const out: [string, string][] = [];
+  for (const line of yaml.split(/\r?\n/)) {
+    const kv = line.match(/^([^\s:#][^:]*):\s*(.*)$/);
+    if (kv) out.push([kv[1].trim(), kv[2].trim().replace(/^\[(.*)\]$/, "$1").replace(/^["']|["']$/g, "")]);
+    else {
+      const item = line.match(/^\s+-\s+(.*)$/);
+      if (item && out.length) out[out.length - 1][1] += `${out[out.length - 1][1] ? ", " : ""}${item[1].replace(/^["']|["']$/g, "")}`;
+    }
+  }
+  return out;
+}
+
+class PropertiesWidget extends WidgetType {
+  constructor(readonly entries: [string, string][]) {
+    super();
+  }
+  eq(other: PropertiesWidget) {
+    return JSON.stringify(other.entries) === JSON.stringify(this.entries);
+  }
+  toDOM(view: EditorView) {
+    const box = document.createElement("div");
+    box.className = "cm-properties";
+    box.title = "Kliknutím upravíš vlastnosti";
+    for (const [key, value] of this.entries) {
+      const row = document.createElement("div");
+      row.className = "cm-prop";
+      const k = document.createElement("span");
+      k.className = "cm-prop-key";
+      k.textContent = key;
+      const v = document.createElement("span");
+      v.className = "cm-prop-value";
+      const parts = key === "tags" || key === "tag" ? value.split(/,\s*/).filter(Boolean) : [value];
+      for (const part of parts) {
+        const chip = document.createElement("span");
+        chip.className = key === "tags" || key === "tag" ? "cm-prop-tag" : key === "type" || key === "status" ? "cm-prop-pill" : "";
+        chip.textContent = key === "tags" || key === "tag" ? `#${part.replace(/^#/, "")}` : part || "–";
+        v.append(chip);
+      }
+      row.append(k, v);
+      box.append(row);
+    }
+    box.addEventListener("mousedown", (e) => {
+      e.preventDefault();
+      view.dispatch({ selection: { anchor: 4 } });
+      view.focus();
+    });
+    return box;
+  }
+  ignoreEvent() {
+    return true;
+  }
+}
+
+function frontmatterDecorations(state: EditorState): DecorationSet {
+  const end = frontmatterEnd(state);
+  if (end < 0) return Decoration.none;
+  // Cursor inside the frontmatter: show the raw YAML for editing.
+  if (state.selection.main.head <= end) return Decoration.none;
+  const yaml = state.doc.sliceString(0, end).replace(/^---\r?\n/, "").replace(/\r?\n---[ \t]*$/, "");
+  const entries = parseProperties(yaml);
+  if (!entries.length) return Decoration.none;
+  return Decoration.set([Decoration.replace({ widget: new PropertiesWidget(entries), block: true }).range(0, end)]);
+}
+
+const frontmatterField = StateField.define<DecorationSet>({
+  create: frontmatterDecorations,
+  update: (deco, tr) => (tr.docChanged || tr.selection ? frontmatterDecorations(tr.state) : deco),
+  provide: (f) => EditorView.decorations.from(f),
+});
 
 const livePreview = ViewPlugin.fromClass(
   class {
@@ -400,11 +481,14 @@ export default function Editor({ path, value, onChange, jumpLine, active }: Prop
   const settings = getState().settings;
 
   useEffect(() => {
+    const fm = value.match(FRONTMATTER_RE);
     const state = EditorState.create({
       doc: value,
+      // Start below the frontmatter so it opens as a tidy properties block.
+      selection: { anchor: fm ? fm[0].length : 0 },
       extensions: [
         vimComp.current.of(settings?.vimMode ? vim() : []),
-        liveComp.current.of(settings?.livePreview === false ? [] : livePreview),
+        liveComp.current.of(settings?.livePreview === false ? [] : [livePreview, frontmatterField]),
         history(),
         drawSelection(),
         closeBrackets(),
@@ -534,7 +618,7 @@ export default function Editor({ path, value, onChange, jumpLine, active }: Prop
   }, [settings?.vimMode]);
 
   useEffect(() => {
-    viewRef.current?.dispatch({ effects: liveComp.current.reconfigure(settings?.livePreview === false ? [] : livePreview) });
+    viewRef.current?.dispatch({ effects: liveComp.current.reconfigure(settings?.livePreview === false ? [] : [livePreview, frontmatterField]) });
   }, [settings?.livePreview]);
 
   useEffect(() => {
