@@ -237,6 +237,9 @@ function createWindow(): void {
   win.on("closed", () => (win = undefined));
 }
 
+// Windows groups taskbar buttons and shortcuts by this id (same as build.appId).
+if (process.platform === "win32") app.setAppUserModelId("io.github.gerchanisko.vimmi");
+
 app.whenReady().then(async () => {
   nativeTheme.themeSource = loadSettings().theme;
 

@@ -158,7 +158,8 @@ const { sampleNotes } = await import("../dist-electron/sample-for-test.cjs");
 }
 
 const app = await electron.launch({
-  args: ["."],
+  // CI Linux runners block the Chromium sandbox; desktop installs keep it.
+  args: [".", ...(process.env.CI && process.platform === "linux" ? ["--no-sandbox"] : [])],
   env: {
     ...process.env,
     VIMMI_USER_DATA: userData,

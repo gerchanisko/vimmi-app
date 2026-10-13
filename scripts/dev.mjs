@@ -11,6 +11,8 @@ spawn("node", ["scripts/build-electron.mjs"], { stdio: "inherit" }).on("exit", (
   spawn("node", ["scripts/build-electron.mjs", "--watch"], { stdio: "inherit" });
   const electron = spawn("npx", ["electron", "."], {
     stdio: "inherit",
+    shell: process.platform === "win32", // npx is npx.cmd on Windows
+
     env: { ...process.env, VITE_DEV_SERVER_URL: url },
   });
   electron.on("exit", () => {

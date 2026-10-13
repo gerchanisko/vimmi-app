@@ -12,10 +12,11 @@
     "start": "npm run build && electron .",
     "typecheck": "tsc --noEmit -p .",
     "test": "vitest run",
-    "dist": "npm run build && electron-builder --linux AppImage",
     "smoke": "npm run build && node test/smoke.mjs",
     "install-desktop": "node scripts/install-linux.mjs",
-    "screenshots": "npm run build && node scripts/screenshots.mjs docs/screenshots"
+    "screenshots": "npm run build && node scripts/screenshots.mjs docs/screenshots",
+    "dist:win": "npm run build && electron-builder --win nsis --publish never",
+    "dist:linux": "npm run build && electron-builder --linux AppImage --publish never"
   },
   "build": {
     "appId": "io.github.gerchanisko.vimmi",
@@ -43,7 +44,25 @@
     "win": {
       "target": [
         "nsis"
-      ]
+      ],
+      "icon": "resources/icon.png",
+      "artifactName": "Vimmi-Setup.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Vimmi",
+      "installerLanguages": [
+        "cs_CZ",
+        "en_US"
+      ],
+      "language": "1029"
+    },
+    "appImage": {
+      "artifactName": "Vimmi.${ext}"
     }
   },
   "dependencies": {

@@ -1,0 +1,75 @@
+# Tests Vimmi on Linux and Windows, then builds the Windows installer and the Linux AppImage
+# and attaches them to a GitHub Release named after the version in package.json.
+name: Build and release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+  pull_request:
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    name: Test (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+      - name: Smoke test (Windows)
+        if: runner.os == 'Windows'
+        run: node test/smoke.mjs test/screenshots
+      - name: Smoke test (Linux)
+        if: runner.os == 'Linux'
+        run: xvfb-run -a node test/smoke.mjs test/screenshots
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-screenshots-${{ matrix.os }}
+          path: test/screenshots
+          if-no-files-found: ignore
+
+  release:
+    name: Release (${{ matrix.os }})
+    if: github.event_name != 'pull_request'
+    needs: test
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            build: npx electron-builder --win nsis --publish never
+            file: release/Vimmi-Setup.exe
+          - os: ubuntu-latest
+            build: npx electron-builder --linux AppImage --publish never
+            file: release/Vimmi.AppImage
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: ${{ matrix.build }}
+      - name: Publish to GitHub Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="v$(node -p "require('./package.json').version")"
+          gh release view "$tag" >/dev/null 2>&1 || gh release create "$tag" --title "Vimmi $tag" --notes-file .github/release-notes.md || true
+          gh release upload "$tag" "${{ matrix.file }}" --clobber
