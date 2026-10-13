@@ -35,9 +35,15 @@ Vše se instaluje do domovské složky (`~/.local/opt/vimmi`); `sudo` se použij
 - **Odinstalace:** `curl -fsSL https://raw.githubusercontent.com/gerchanisko/vimmi-app/main/install.sh | bash -s -- --uninstall` (poznámky a nastavení zůstanou).
 - **Ze stažených zdrojáků:** `git clone https://github.com/gerchanisko/vimmi-app && cd vimmi-app && ./install.sh`
 
-### macOS a Windows
+### Windows 10 a 11
 
-Připravujeme. Verze pro macOS a Windows přijdou později.
+Stáhni instalátor **[Vimmi-Setup.exe](https://github.com/gerchanisko/vimmi-app/releases/latest/download/Vimmi-Setup.exe)** a spusť ho. Vimmi pak najdeš v nabídce Start a na ploše.
+
+Instalátor zatím není digitálně podepsaný, takže Windows může zobrazit modré okno SmartScreen – klikni na **Další informace → Přesto spustit**. Aktualizace: stáhni a spusť novější instalátor. Odinstalace: *Nastavení → Aplikace → Vimmi*.
+
+### macOS
+
+Připravujeme.
 
 ## Snímky
 
@@ -105,8 +111,13 @@ npm start          # sestaví a spustí aplikaci
 npm test           # unit testy (parser, trezor, AI nástroje)
 npm run smoke      # end-to-end test: spustí aplikaci, proklikne funkce, AI (Claude, OpenAI, kompatibilní) proti mock serverům
 npm run install-desktop   # sestaví a nainstaluje do nabídky aplikací (po změnách v kódu)
-npm run dist       # AppImage pro Linux do release/ (vyžaduje FUSE)
+npm run dist:win   # instalátor pro Windows do release/ (na Windows)
+npm run dist:linux # AppImage pro Linux do release/
 ```
+
+### Vydání
+
+GitHub Actions ([`.github/workflows/release.yml`](.github/workflows/release.yml)) spouští unit i end-to-end testy na Windows a Linuxu. Při ručním spuštění nebo tagu `v*` sestaví `Vimmi-Setup.exe` a `Vimmi.AppImage` a přiloží je k vydání podle verze v `package.json`.
 
 ### Struktura
 
