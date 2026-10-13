@@ -29,6 +29,7 @@ step() { printf '\n%s==>%s %s%s%s\n' "$green" "$reset" "$bold" "$*" "$reset"; }
 info() { printf '    %s\n' "$*"; }
 warn() { printf '%s!%s %s\n' "$yellow" "$reset" "$*"; }
 die()  { printf '%sChyba:%s %s\n' "$red" "$reset" "$*" >&2; exit 1; }
+trap 'printf "%sChyba:%s instalace selhala (řádek %s). Zkus to znovu, případně nahlas problém na https://github.com/gerchanisko/vimmi-app/issues\n" "$red" "$reset" "$LINENO" >&2' ERR
 
 # ---------------------------------------------------------------- platform
 
@@ -120,7 +121,8 @@ else
   info "Systémový Node.js chybí nebo je starý – stáhnu oficiální Node.js jen pro Vimmi (bez zásahu do systému)."
   index="$(curl -fsSL https://nodejs.org/dist/index.json)" || die "Nepodařilo se stáhnout seznam verzí Node.js."
   # First LTS release in the index is the newest LTS.
-  version="$(printf '%s' "$index" | grep -o '"version":"v[0-9.]*"[^}]*"lts":"[A-Za-z]*"' | head -n1 | grep -o '"v[0-9][0-9.]*"' | head -n1 | tr -d '"')"
+  # sed (not head) takes the first match: head would close the pipe early and, with pipefail, abort the script.
+  version="$(printf '%s' "$index" | grep -o '"version":"v[0-9.]*"[^}]*"lts":"[A-Za-z]*"' | sed -n '1s/^"version":"\(v[0-9.]*\)".*/\1/p')"
   [ -n "$version" ] || die "Nepodařilo se zjistit aktuální verzi Node.js LTS."
   file="node-$version-linux-$NODE_ARCH.tar.xz"
   tmp="$(mktemp -d)"
