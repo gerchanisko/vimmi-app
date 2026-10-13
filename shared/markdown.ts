@@ -84,12 +84,20 @@ export function parseTaskLine(line: string): Omit<Task, "path" | "line" | "proje
 }
 
 /** Task text without the metadata markers, for display. */
-export function taskDisplayText(text: string): string {
+/** Removes task metadata markers (dates, priorities, completion stamps). */
+function stripTaskMeta(text: string): string {
   return text
+    .replace(/✅\s*\d{4}-\d{2}-\d{2}/gu, "")
     .replace(/📅\s*\d{4}-\d{2}-\d{2}/gu, "")
     .replace(/(^|\s)@\d{4}-\d{2}-\d{2}\b/g, "$1")
     .replace(/(^|\s)![123](?=\s|$)/g, "$1")
-    .replace(/[⏫🔺🔼🔽]/gu, "")
+    .replace(/[⏫🔺🔼🔽]/gu, "");
+}
+
+/** Task text for display: no metadata markers, [[links]] shown as their label. */
+export function taskDisplayText(text: string): string {
+  return stripTaskMeta(text)
+    .replace(WIKILINK_RE, (_m, target: string, _h, alias?: string) => alias || target)
     .replace(/\s{2,}/g, " ")
     .trim();
 }
@@ -165,11 +173,19 @@ export function parseNote(
     if (task && task.text) tasks.push({ ...task, text: rawLine.match(TASK_RE)![3].trim(), path, line: lineNo, project });
   });
 
-  const plain = body
-    .replace(/```[\s\S]*?```/g, " ")
-    .replace(/^#+\s+/gm, "")
-    .replace(WIKILINK_RE, (_m, target: string, _h, alias?: string) => alias || target)
-    .replace(/[*_`>#-]+/g, " ")
+  const plain = stripTaskMeta(
+    body
+      .replace(/```[\s\S]*?```/g, " ")
+      .replace(/^\s*#{1,6}\s+/gm, "")
+      .replace(/^\s*>\s?/gm, "")
+      .replace(/^\s*(?:[-*+]|\d+[.)])\s+(?:\[[ xX]\]\s+)?/gm, "")
+      .replace(/^\s*\|?[\s:|-]+\|[\s:|-]*$/gm, " ")
+      .replace(WIKILINK_RE, (_m, target: string, _h, alias?: string) => alias || target)
+      .replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1")
+      .replace(/(\*\*|__|~~|`)/g, "")
+      .replace(/(^|\s)[*_](\S)/g, "$1$2")
+      .replace(/(\S)[*_](?=\s|$)/g, "$1"),
+  )
     .replace(/\s+/g, " ")
     .trim();
 

@@ -778,6 +778,49 @@ textarea {
   color: var(--accent-text);
   cursor: pointer;
 }
+.cm-due-chip {
+  font-size: 0.78em;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--surface-hover);
+  color: var(--text-2);
+  vertical-align: 1px;
+  text-decoration: none;
+  display: inline-block;
+  line-height: 1.5;
+}
+.cm-due-chip.today {
+  background: var(--accent-soft);
+  color: var(--accent-text);
+}
+.cm-due-chip.overdue {
+  background: var(--del-bg);
+  color: var(--clay);
+}
+.cm-prio {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  vertical-align: 1px;
+}
+.cm-prio.p1 {
+  background: var(--clay);
+}
+.cm-prio.p2 {
+  background: var(--ochre);
+}
+.cm-prio.p3 {
+  background: var(--blue);
+}
+.cm-done-chip {
+  color: var(--sage);
+  font-size: 0.85em;
+}
+.cm-task-done .cm-due-chip,
+.cm-task-done .cm-done-chip {
+  text-decoration: none;
+}
 .cm-task-done {
   color: var(--text-3);
   text-decoration: line-through;

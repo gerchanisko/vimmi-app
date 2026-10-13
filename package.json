@@ -14,7 +14,8 @@
     "test": "vitest run",
     "dist": "npm run build && electron-builder --linux AppImage",
     "smoke": "npm run build && node test/smoke.mjs",
-    "install-desktop": "node scripts/install-linux.mjs"
+    "install-desktop": "node scripts/install-linux.mjs",
+    "screenshots": "npm run build && node scripts/screenshots.mjs docs/screenshots"
   },
   "build": {
     "appId": "io.github.gerchanisko.vimmi",

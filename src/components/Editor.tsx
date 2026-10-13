@@ -165,6 +165,27 @@ class BulletWidget extends WidgetType {
   }
 }
 
+class ChipWidget extends WidgetType {
+  constructor(readonly text: string, readonly cls: string, readonly title: string) {
+    super();
+  }
+  eq(other: ChipWidget) {
+    return other.text === this.text && other.cls === this.cls;
+  }
+  toDOM() {
+    const span = document.createElement("span");
+    span.className = this.cls;
+    span.textContent = this.text;
+    span.title = this.title;
+    return span;
+  }
+}
+
+function todayIso(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 const hidden = Decoration.replace({});
 const bullet = Decoration.replace({ widget: new BulletWidget() });
 const quoteLine = Decoration.line({ class: "cm-quote-line" });
@@ -225,9 +246,28 @@ function buildLivePreview(view: EditorView): DecorationSet {
       },
     });
 
-    // Wikilinks: show only the label.
+    // Wikilinks: show only the label. Task metadata (@date, !priority, ✅ date) becomes small chips.
+    const today = todayIso();
+    const year = today.slice(0, 4);
     for (let pos = from; pos <= to; ) {
       const line = doc.lineAt(pos);
+      if (!active.has(line.number) && /^\s*[-*+] \[[ xX]\] /.test(line.text)) {
+        for (const m of line.text.matchAll(/(^|\s)(@(\d{4})-(\d{2})-(\d{2}))(?=\s|$)/g)) {
+          const start = line.from + m.index! + m[1].length;
+          const date = m[2].slice(1);
+          const label = `${Number(m[5])}. ${Number(m[4])}.${m[3] === year ? "" : ` ${m[3]}`}`;
+          const cls = `cm-due-chip${date < today ? " overdue" : date === today ? " today" : ""}`;
+          out.push(Decoration.replace({ widget: new ChipWidget(date === today ? "dnes" : label, cls, date) }).range(start, start + m[2].length));
+        }
+        for (const m of line.text.matchAll(/(^|\s)(!([123]))(?=\s|$)/g)) {
+          const start = line.from + m.index! + m[1].length;
+          out.push(Decoration.replace({ widget: new ChipWidget("", `cm-prio p${m[3]}`, `Priorita ${m[3]}`) }).range(start, start + 2));
+        }
+        for (const m of line.text.matchAll(/✅ (\d{4}-\d{2}-\d{2})/gu)) {
+          const start = line.from + m.index!;
+          out.push(Decoration.replace({ widget: new ChipWidget("✓", "cm-done-chip", `Splněno ${m[1]}`) }).range(start, start + m[0].length));
+        }
+      }
       if (!active.has(line.number)) {
         const plain = line.text.replace(/`[^`]*`/g, (m) => " ".repeat(m.length));
         for (const m of plain.matchAll(/(!?)\[\[([^\]|\n]+?)(\|[^\]\n]*)?\]\]/g)) {

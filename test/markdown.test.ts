@@ -51,6 +51,7 @@ describe("tasks", () => {
     expect(line).toBe("- [ ] Napsat report @2026-10-20 !2");
     expect(toggleTaskInLine(line)).toBe("- [x] Napsat report @2026-10-20 !2");
     expect(taskDisplayText("Napsat report @2026-10-20 !2")).toBe("Napsat report");
+    expect(taskDisplayText("Texty pro [[Web Vimmi]] a [[Plán|plán]] ✅ 2026-10-13")).toBe("Texty pro Web Vimmi a plán");
   });
 
   it("records line numbers including the frontmatter offset and project", () => {
@@ -90,4 +91,9 @@ describe("links", () => {
 
 it("folds accents for search", () => {
   expect(fold("Úkol Žluťoučký")).toBe("ukol zlutoucky");
+});
+
+it("builds clean excerpts", () => {
+  const note = parseNote("d.md", "# Úterý 2026-10-13\n\n## Dnes\n- [ ] Napsat **texty** pro [[Web Vimmi]] !1\n- [x] Procházka ✅ 2026-10-13\n> citát", {}, stat);
+  expect(note.excerpt).toBe("Úterý 2026-10-13 Dnes Napsat texty pro Web Vimmi Procházka citát");
 });

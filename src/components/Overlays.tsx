@@ -1,6 +1,6 @@
 // Spotlight search (Ctrl+K), command palette (Ctrl+P), dialogs, toasts, template picker.
 import { useEffect, useMemo, useRef, useState } from "react";
-import { basename, fold, taskDisplayText } from "../../shared/markdown";
+import { basename, fold, taskDisplayText, WIKILINK_RE } from "../../shared/markdown";
 import type { SearchHit } from "../../shared/types";
 import { askAi, newFromTemplate, newNote, toggleTask } from "../lib/actions";
 import { openNote, openView, setState, useApp } from "../lib/store";
@@ -103,7 +103,8 @@ export function Spotlight({ initial }: { initial?: string }) {
       if (h.kind === "task") out.push({ kind: "task", hit: h });
       else if (!seen.has(h.path)) {
         seen.add(h.path);
-        out.push({ kind: "note", path: h.path, title: h.title, sub: h.path, line: h.snippets[0]?.line, snippet: h.snippets[0]?.text, project: h.kind === "project" });
+        const snippet = h.snippets[0]?.text.replace(WIKILINK_RE, (_m, target: string, _h, alias?: string) => alias || target);
+        out.push({ kind: "note", path: h.path, title: h.title, sub: h.path, line: h.snippets[0]?.line, snippet, project: h.kind === "project" });
       }
     }
     const exact = notes.some((n) => fold(n.title) === q);

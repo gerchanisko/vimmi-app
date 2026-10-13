@@ -11,7 +11,7 @@ Poznámky, úkoly a projekty v jednom klidném prostoru – s AI asistentem.</p>
 
 Poznámky jsou obyčejné soubory Markdown ve složce (trezoru), takže jsou vždycky tvoje a funguje to i s trezorem z Obsidianu. AI asistent (Claude, OpenRouter, OpenAI, Gemini nebo lokální Ollama) umí v poznámkách hledat, shrnovat, plánovat a rovnou je upravovat.
 
-![Vimmi – AI asistent](docs/screenshots/ai-chat.png)
+![Vimmi – AI asistent](docs/screenshots/editor-ai.png)
 
 ## Instalace
 
@@ -43,7 +43,7 @@ Připravujeme. Verze pro macOS a Windows přijdou později.
 
 | Dnes | Graf souvislostí | Tmavý vzhled |
 | --- | --- | --- |
-| ![Dnes](docs/screenshots/dnes.png) | ![Graf](docs/screenshots/graf.png) | ![Tmavý vzhled](docs/screenshots/tmavy.png) |
+| ![Dnes](docs/screenshots/today.png) | ![Graf](docs/screenshots/graph.png) | ![Tmavý vzhled](docs/screenshots/dark.png) |
 
 ## Funkce
 
