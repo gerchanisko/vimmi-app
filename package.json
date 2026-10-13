@@ -1,0 +1,96 @@
+{
+  "name": "vimmi",
+  "productName": "Vimmi",
+  "version": "0.1.0",
+  "description": "Poznámky, úkoly a projekty na jednom klidném místě – s AI asistentem Claude.",
+  "author": "gerchanisko",
+  "private": true,
+  "main": "dist-electron/main.js",
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "build": "tsc --noEmit -p . && vite build && node scripts/build-electron.mjs",
+    "start": "npm run build && electron .",
+    "typecheck": "tsc --noEmit -p .",
+    "test": "vitest run",
+    "dist": "npm run build && electron-builder --linux AppImage",
+    "smoke": "npm run build && node test/smoke.mjs",
+    "install-desktop": "node scripts/install-linux.mjs"
+  },
+  "build": {
+    "appId": "io.github.gerchanisko.vimmi",
+    "productName": "Vimmi",
+    "files": [
+      "dist/**",
+      "dist-electron/**",
+      "package.json"
+    ],
+    "directories": {
+      "output": "release",
+      "buildResources": "resources"
+    },
+    "linux": {
+      "target": [
+        "dir"
+      ],
+      "category": "Office",
+      "icon": "resources/icon.png",
+      "executableName": "vimmi"
+    },
+    "mac": {
+      "category": "public.app-category.productivity"
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ]
+    }
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.133.0",
+    "gray-matter": "^4.0.3",
+    "markdown-it": "^15.0.2",
+    "openai": "^7.32.0",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@codemirror/autocomplete": "^6.20.3",
+    "@codemirror/commands": "^6.11.1",
+    "@codemirror/lang-markdown": "^6.5.2",
+    "@codemirror/lang-yaml": "^6.1.3",
+    "@codemirror/language": "^6.13.1",
+    "@codemirror/language-data": "^6.5.2",
+    "@codemirror/search": "^6.7.2",
+    "@codemirror/state": "^6.7.6",
+    "@codemirror/view": "^6.43.14",
+    "@lezer/highlight": "^1.2.5",
+    "@replit/codemirror-vim": "^6.4.0",
+    "@types/d3-force": "^3.0.10",
+    "@types/node": "^26.6.5",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "concurrently": "^10.0.6",
+    "d3-force": "^3.0.0",
+    "electron": "^44.7.0",
+    "electron-builder": "^26.15.3",
+    "esbuild": "^0.28.2",
+    "lucide-react": "^1.56.0",
+    "playwright-core": "^1.64.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.4",
+    "vitest": "^5.0.4",
+    "wait-on": "^9.5.1"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true,
+    "electron-winstaller": false
+  },
+  "desktopName": "vimmi.desktop",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/gerchanisko/vimmi-app.git"
+  },
+  "homepage": "https://gerchanisko.github.io/vimmi/"
+}

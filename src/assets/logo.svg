@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="96" height="96" role="img" aria-labelledby="title">
+  <title id="title">Vimmi</title>
+  <style>
+    .v { fill: #171717; }
+    @media (prefers-color-scheme: dark) { .v { fill: #F5F5F3; } }
+  </style>
+  <path class="v" d="M2 4h5l5 10 1.75-3.5h5L14 20h-4z"/>
+  <circle cx="18.38" cy="6.24" r="2.24" fill="#6D63FF"/>
+</svg>
