@@ -5,6 +5,7 @@ import http from "node:http";
 import os from "node:os";
 import path from "node:path";
 import { _electron as electron } from "playwright-core";
+import { preview } from "vite";
 
 const out = path.resolve(process.argv[2] ?? "docs/screenshots");
 const scale = process.argv[3] ?? "1.5";
@@ -176,5 +177,52 @@ try {
 } finally {
   await app.close().catch(() => {});
   server.close();
-  fs.rmSync(tmp, { recursive: true, force: true });
 }
+
+// ---------- phone (web app at iPhone size; needs `npm run build:web`) ----------
+if (fs.existsSync("dist-web/index.html")) {
+  const web = await preview({ configFile: "vite.web.config.mts", preview: { port: 0, strictPort: false }, logLevel: "error" });
+  const phoneApp = await electron.launch({
+    args: [path.resolve("test/browser-main.cjs"), `--force-device-scale-factor=3`],
+    env: {
+      ...process.env,
+      URL: web.resolvedUrls.local[0],
+      UD: path.join(tmp, "phone"),
+      W: "390",
+      H: "844",
+      UA: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1",
+    },
+  });
+  const ph = await phoneApp.firstWindow();
+  const phoneShot = async (name) => {
+    await ph.waitForTimeout(600);
+    await ph.screenshot({ path: path.join(out, `${name}.png`) });
+    console.log("✓", name);
+  };
+  try {
+    await ph.waitForSelector(".welcome", { timeout: 20000 });
+    await ph.evaluate(() => localStorage.setItem("vimmi:settings", JSON.stringify({ theme: "light" })));
+    await ph.click("text=Začít psát");
+    await ph.waitForSelector(".workspace");
+    await ph.evaluate(async (all) => {
+      for (const [p, text] of Object.entries(all)) await window.vimmi.vault.write(p, text);
+    }, notes);
+    await ph.reload();
+    await ph.waitForSelector(".workspace");
+    await ph.click(".bottom-bar >> text=Dnes");
+    await phoneShot("phone-today");
+    await ph.click(".mobile-top button[aria-label=Menu]");
+    await ph.waitForTimeout(400);
+    await phoneShot("phone-drawer");
+    await ph.click(".drawer >> text=Web Vimmi");
+    await ph.waitForTimeout(400);
+    await phoneShot("phone-note");
+    await ph.evaluate(() => (document.documentElement.dataset.theme = "dark"));
+    await ph.click(".bottom-bar >> text=Úkoly");
+    await phoneShot("phone-tasks-dark");
+  } finally {
+    await phoneApp.close().catch(() => {});
+    await web.close();
+  }
+}
+fs.rmSync(tmp, { recursive: true, force: true });

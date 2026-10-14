@@ -2616,6 +2616,15 @@ label.check {
   .filter-input {
     width: 100%;
   }
+  .toolbar .segmented {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    max-width: 100%;
+    scrollbar-width: none;
+  }
+  .toolbar .segmented button {
+    flex: none;
+  }
   /* Side panel (AI, links…) becomes a full-screen sheet. */
   .workspace.mobile .right-panel {
     position: fixed;
