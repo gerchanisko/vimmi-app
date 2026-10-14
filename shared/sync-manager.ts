@@ -5,7 +5,7 @@ import type { SyncStatus } from "./types";
 import type { Vault } from "./vault";
 
 const AFTER_EDIT_MS = 15_000;
-const INTERVAL_MS = 120_000;
+const INTERVAL_MS = 60_000;
 
 export class SyncManager extends Emitter {
   status: SyncStatus = { state: "off" };

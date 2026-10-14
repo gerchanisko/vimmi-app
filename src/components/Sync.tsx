@@ -184,7 +184,7 @@ export function SyncSettingsPanel({ settings }: { settings: Settings }) {
               Vypnout
             </button>
           </div>
-          <p className="muted small">Synchronizuje se automaticky: při spuštění, chvíli po úpravě, každé 2 minuty a při návratu do aplikace.</p>
+          <p className="muted small">Synchronizuje se automaticky: při spuštění, chvíli po úpravě, každou minutu a při návratu do aplikace.</p>
         </div>
       ) : (
         <ol className="sync-steps">

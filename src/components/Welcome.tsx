@@ -60,6 +60,7 @@ export default function Welcome() {
 
 function WebWelcome({ run }: { run: (fn: () => Promise<VaultSnapshot | null>) => Promise<void> }) {
   const ios = /iPhone|iPad|iPod/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
+  const android = /Android/.test(navigator.userAgent);
   const connect = async () => {
     // Start with an empty vault; the first sync downloads the notes.
     await run(() => window.vimmi.vault.open(""));
@@ -71,7 +72,13 @@ function WebWelcome({ run }: { run: (fn: () => Promise<VaultSnapshot | null>) =>
         <Logo size={44} />
         <h1>Vimmi</h1>
         <p className="lead">Všechno důležité. Na jednom místě.</p>
-        <p className="muted">Poznámky, úkoly a projekty s AI asistentem. Ukládají se v tomto zařízení a přes GitHub je můžeš synchronizovat s počítačem.</p>
+        <p className="muted">
+          Poznámky, úkoly a projekty s AI asistentem. Ukládají se v tomto zařízení a přes GitHub je můžeš synchronizovat s počítačem –{" "}
+          <a href="https://vimmi.space/navod.html#sync" target="_blank" rel="noreferrer">
+            návod
+          </a>
+          .
+        </p>
         <div className="welcome-actions">
           <button className="btn primary big" onClick={() => void run(window.vimmi.vault.createSample)}>
             <Icon name="plus" /> Začít psát
@@ -80,6 +87,14 @@ function WebWelcome({ run }: { run: (fn: () => Promise<VaultSnapshot | null>) =>
             <Icon name="cloud" /> Mám poznámky na GitHubu
           </button>
         </div>
+        {android && !isStandalone() && (
+          <div className="install-hint">
+            <strong>Tip: nainstaluj si Vimmi</strong>
+            <span>
+              V Chrome klepni na <b>⋮</b> vpravo nahoře a vyber <b>Přidat na plochu</b> (nebo <b>Instalovat aplikaci</b>). Vimmi pak poběží jako aplikace.
+            </span>
+          </div>
+        )}
         {ios && !isStandalone() && (
           <div className="install-hint">
             <strong>Tip: přidej si Vimmi na plochu</strong>
