@@ -1,7 +1,7 @@
 {
   "name": "vimmi",
   "productName": "Vimmi",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Poznámky, úkoly a projekty na jednom klidném místě – s AI asistentem Claude.",
   "author": "gerchanisko",
   "private": true,
@@ -66,10 +66,18 @@
     },
     "appImage": {
       "artifactName": "Vimmi.${ext}"
-    }
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "gerchanisko",
+        "repo": "vimmi-app"
+      }
+    ]
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.133.0",
+    "electron-updater": "^6.8.9",
     "js-yaml": "^5.4.3",
     "markdown-it": "^15.0.2",
     "openai": "^7.32.0",

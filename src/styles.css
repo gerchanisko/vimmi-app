@@ -2446,6 +2446,47 @@ label.check {
   font-size: 14px;
 }
 
+/* ---------- updates ---------- */
+.update-banner {
+  position: fixed;
+  left: 16px;
+  bottom: 16px;
+  z-index: 45;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: min(460px, calc(100vw - 32px));
+  padding: 10px 10px 10px 14px;
+  border-radius: var(--radius-m);
+  background: var(--surface-raised);
+  border: 1px solid var(--accent-line);
+  box-shadow: var(--shadow-lg);
+  animation: rise 0.2s var(--ease);
+}
+.update-banner > svg {
+  color: var(--accent);
+  flex: none;
+}
+.update-banner > span {
+  flex: 1;
+  font-size: 13px;
+}
+.update-banner.quiet {
+  border-color: var(--border);
+  padding: 8px 14px;
+  color: var(--text-2);
+}
+.update-settings {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin-top: 16px;
+}
+.update-toggle {
+  margin-top: 4px;
+}
+
 /* ---------- phone layout ---------- */
 .workspace.mobile {
   display: block;
@@ -2724,6 +2765,12 @@ label.check {
   }
   .dialog {
     align-self: center;
+  }
+  .update-banner {
+    left: 8px;
+    right: 8px;
+    max-width: none;
+    bottom: calc(76px + env(safe-area-inset-bottom));
   }
   .quick-panel {
     left: 8px;

@@ -99,6 +99,8 @@ export interface Settings {
   customInstructions: string;
   /** GitHub sync of the vault (the token is stored separately, encrypted). */
   sync: SyncSettings;
+  /** Install new versions automatically. */
+  autoUpdate: boolean;
   /** Derived: the active provider has a key (or needs none). */
   hasApiKey: boolean;
   /** Derived: which providers have a stored key. */
@@ -112,6 +114,17 @@ export interface SyncSettings {
   owner: string;
   repo: string;
   branch?: string;
+}
+
+export interface UpdateStatus {
+  state: "idle" | "checking" | "latest" | "available" | "downloading" | "installing" | "ready" | "error";
+  /** auto = electron-updater, script = Linux install.sh, reload = web app, none = development build */
+  method: "auto" | "script" | "reload" | "none";
+  current: string;
+  version?: string;
+  progress?: number;
+  message?: string;
+  lastCheck?: number;
 }
 
 export interface SyncStatus {
@@ -143,6 +156,7 @@ export const DEFAULT_SETTINGS: Settings = {
   livePreview: true,
   customInstructions: "",
   sync: { enabled: false, owner: "", repo: "vimmi-poznamky" },
+  autoUpdate: true,
   hasApiKey: false,
   keys: {},
   hasSyncToken: false,

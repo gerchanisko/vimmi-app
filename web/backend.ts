@@ -8,7 +8,7 @@ import { isoDate } from "../shared/markdown";
 import { PROVIDER_MAP, PROVIDERS, type ProviderId } from "../shared/providers";
 import { createPrivateRepo, githubUser } from "../shared/sync";
 import { SyncManager } from "../shared/sync-manager";
-import { DEFAULT_SETTINGS, type Settings, type SyncSettings } from "../shared/types";
+import { DEFAULT_SETTINGS, type Settings, type SyncSettings, type UpdateStatus } from "../shared/types";
 import { Vault } from "../shared/vault";
 import { dailyNote, noteFromTemplate, templatePaths } from "../shared/vault-actions";
 import { IdbStorage, kvDelete, kvGet, kvSet, openDb } from "./idb-storage";
@@ -112,6 +112,38 @@ export async function installBackend(): Promise<void> {
 
   if (!storage.isEmpty() || localStorage.getItem(VAULT_FLAG)) await openVault();
 
+  // ---------- updates: a new deploy changes version.json ----------
+
+  let update: UpdateStatus = { state: "idle", method: "reload", current: __APP_VERSION__ };
+  const setUpdate = (patch: Partial<UpdateStatus>) => {
+    update = { ...update, ...patch };
+    bus.emit("update:status", update);
+  };
+  const checkUpdate = async (): Promise<UpdateStatus> => {
+    if (location.protocol !== "https:" && !localStorage.getItem("vimmi:dev-update-check")) return update;
+    try {
+      const res = await fetch(`./version.json?t=${Date.now()}`, { cache: "no-store" });
+      const info = (await res.json()) as { version: string; build: string };
+      if (info.build !== __BUILD_ID__) setUpdate({ state: "ready", version: info.version, lastCheck: Date.now() });
+      else setUpdate({ state: "latest", lastCheck: Date.now() });
+    } catch {
+      /* offline: try again later */
+    }
+    return update;
+  };
+  let hiddenSince = 0;
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") {
+      hiddenSince = Date.now();
+      return;
+    }
+    // Back in the app after a while with a new version waiting: reload into it (notes are saved continuously).
+    if (update.state === "ready" && settings.autoUpdate && Date.now() - hiddenSince > 3000) location.reload();
+    else void checkUpdate();
+  });
+  setInterval(() => void checkUpdate(), 10 * 60 * 1000);
+  setTimeout(() => void checkUpdate(), 5000);
+
   // ---------- AI ----------
 
   const agent = new Agent({
@@ -204,6 +236,16 @@ export async function installBackend(): Promise<void> {
         }),
       onStatus: (cb) => on("sync:status", cb),
     },
+    update: {
+      status: () => wrap(() => update),
+      check: () => checkUpdate(),
+      install: () => wrap(() => undefined),
+      restart: () =>
+        wrap(() => {
+          location.reload();
+        }),
+      onStatus: (cb) => on("update:status", cb),
+    },
     ai: {
       chats: () => agent.listChats(),
       chat: (id) => agent.getChat(id),
@@ -248,3 +290,4 @@ export async function installBackend(): Promise<void> {
 }
 
 declare const __APP_VERSION__: string;
+declare const __BUILD_ID__: string;

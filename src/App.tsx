@@ -14,6 +14,7 @@ import Welcome, { enterVault } from "./components/Welcome";
 import { newNote, toggleRight } from "./lib/actions";
 import { isMobile, useMobile } from "./lib/mobile";
 import { SyncIndicator } from "./components/Sync";
+import { UpdateBanner } from "./components/Update";
 import { handleShortcut } from "./lib/commands";
 import { flushAll, reloadDoc } from "./lib/docs";
 import { closeTab, getState, openNote, openView, refreshSnapshot, setState, useApp, type Tab } from "./lib/store";
@@ -91,6 +92,7 @@ export default function App() {
       {overlay?.type === "template" && <TemplatePicker />}
       {overlay?.type === "settings" && <Settings initialTab={overlay.tab} />}
       <AiQuickPanel />
+      {snapshot && <UpdateBanner />}
       <DialogHost />
       <MenuHost />
       <Toasts />

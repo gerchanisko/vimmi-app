@@ -1,6 +1,6 @@
 // Vimmi service worker: keeps the app working offline.
 // App files with hashed names are cached forever; the page itself is network-first so updates arrive.
-const CACHE = "vimmi-v1";
+const CACHE = "vimmi-v2";
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE).then((c) => c.addAll(["./", "./manifest.webmanifest", "./icon-192.png"])));
@@ -18,6 +18,8 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(req.url);
   // Only our own files; API calls (AI, GitHub) always go to the network.
   if (req.method !== "GET" || url.origin !== self.location.origin) return;
+  // The version file must always come from the network, or updates would never be noticed.
+  if (url.pathname.endsWith("/version.json")) return;
 
   if (req.mode === "navigate") {
     event.respondWith(

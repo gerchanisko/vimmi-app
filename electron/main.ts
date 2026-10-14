@@ -11,6 +11,7 @@ import { dailyNote as dailyNoteFor, noteFromTemplate, templatePaths } from "../s
 import os from "node:os";
 import { createPrivateRepo, githubUser } from "../shared/sync";
 import { SyncManager } from "../shared/sync-manager";
+import { Updater } from "./updater";
 import type { SyncSettings } from "../shared/types";
 import { getApiKey, getSyncToken, keyStorageIsEncrypted, loadSettings, saveSettings, setApiKey } from "./settings";
 import { sampleNotes } from "./sample";
@@ -49,6 +50,11 @@ const sync = new SyncManager(
   },
 );
 sync.on("status", (st) => send("sync:status", st));
+
+const updater = new Updater(
+  (st) => send("update:status", st),
+  () => loadSettings().autoUpdate,
+);
 
 async function openVault(dir: string): Promise<void> {
   vault?.close();
@@ -157,6 +163,12 @@ function registerIpc(): void {
     noteFromTemplate(requireVault(), template, title, folder),
   );
   handle("vault:reveal", (rel: string) => shell.showItemInFolder(requireVault().abs(rel)));
+
+  // updates
+  handle("update:status", () => updater.status);
+  handle("update:check", () => updater.check());
+  handle("update:install", () => updater.install());
+  handle("update:restart", () => updater.restart());
 
   // sync
   handle("sync:status", () => sync.status);
@@ -281,6 +293,7 @@ app.whenReady().then(async () => {
     }
   }
   createWindow();
+  updater.start();
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });

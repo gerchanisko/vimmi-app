@@ -180,6 +180,17 @@ try {
     await ph.screenshot({ path: path.join(shots, "sync-04-phone-offline.png") });
   });
 
+  await step("phone notices a new deploy and reloads into it", async () => {
+    await ph.evaluate(() => localStorage.setItem("vimmi:dev-update-check", "1"));
+    await ph.route("**/version.json*", (route) => route.fulfill({ contentType: "application/json", body: JSON.stringify({ version: "9.9.9", build: "novy-build" }) }));
+    await ph.evaluate(() => window.vimmi.update.check());
+    await ph.waitForSelector(".update-banner >> text=Je k dispozici nová verze Vimmi.");
+    await ph.screenshot({ path: path.join(shots, "sync-06-phone-update.png") });
+    await ph.unroute("**/version.json*");
+    await Promise.all([ph.waitForEvent("load"), ph.click(".update-banner >> text=Obnovit")]);
+    await ph.waitForSelector(".workspace", { timeout: 20000 });
+  });
+
   const unexpected = errors.filter((e) => !/127\.0\.0\.1:9|ERR_CONNECTION_REFUSED|Failed to fetch/.test(e));
   if (unexpected.length) throw new Error(`page errors:\n${unexpected.join("\n")}`);
   console.log(`\nAll good. Screenshots in ${shots}`);

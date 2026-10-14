@@ -6,6 +6,7 @@ import { COMMANDS } from "../lib/commands";
 import { errorText, setState, toast, useApp } from "../lib/store";
 import { Icon, Logo } from "./Icon";
 import { SyncSettingsPanel } from "./Sync";
+import { UpdateSettings } from "./Update";
 
 const TABS = [
   { id: "general", label: "Obecné", icon: "settings" },
@@ -261,6 +262,7 @@ export default function Settings({ initialTab }: { initialTab?: string }) {
               <h3>Vimmi {version}</h3>
               <p>Méně chaosu. Více prostoru pro to důležité.</p>
               <p className="muted">Poznámky jsou obyčejné soubory Markdown ve tvém trezoru. Patří tobě.</p>
+              <UpdateSettings autoUpdate={settings.autoUpdate} onToggle={(v) => void update({ autoUpdate: v })} />
               <div className="row-actions">
                 <button className="btn" onClick={() => void window.vimmi.app.openExternal("https://gerchanisko.github.io/vimmi/")}>
                   Web <Icon name="external" size={13} />

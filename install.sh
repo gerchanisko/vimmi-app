@@ -22,6 +22,8 @@ DESKTOP_FILE="$HOME/.local/share/applications/vimmi.desktop"
 ICON_FILE="$HOME/.local/share/icons/hicolor/512x512/apps/vimmi.png"
 APPARMOR_PROFILE="/etc/apparmor.d/vimmi"
 NODE_MIN=22
+# Set by the app when it updates itself in the background: never wait for a sudo password.
+NONINTERACTIVE="${VIMMI_NONINTERACTIVE:-}"
 
 bold=$'\e[1m'; dim=$'\e[2m'; green=$'\e[32m'; yellow=$'\e[33m'; red=$'\e[31m'; reset=$'\e[0m'
 [ -t 1 ] || { bold=""; dim=""; green=""; yellow=""; red=""; reset=""; }
@@ -66,6 +68,7 @@ if command -v sudo >/dev/null 2>&1; then SUDO="sudo"; elif command -v doas >/dev
 
 pkg_install() {
   [ $# -gt 0 ] || return 0
+  [ -z "$NONINTERACTIVE" ] || die "Chybí systémové balíčky ($*). Spusť instalaci jednou ručně v terminálu."
   [ -n "$PKG" ] || die "Nainstaluj prosím ručně: $* (nepoznal jsem správce balíčků)."
   [ -n "$SUDO" ] || die "Chybí sudo. Nainstaluj prosím ručně: $*"
   info "Instaluji systémové balíčky: $* ${dim}(může se zeptat na heslo)${reset}"
@@ -172,9 +175,11 @@ npm run --silent install-desktop
 
 # Ubuntu 24.04+ restricts unprivileged user namespaces, which Electron's sandbox needs.
 # The recommended fix is a small AppArmor profile for the app binary.
-if [ "$(cat /proc/sys/kernel/apparmor_restrict_unprivileged_userns 2>/dev/null || echo 0)" = "1" ]; then
+if [ "$(cat /proc/sys/kernel/apparmor_restrict_unprivileged_userns 2>/dev/null || echo 0)" = "1" ] && [ ! -f "$APPARMOR_PROFILE" ]; then
   step "Povoluji sandbox Electronu (AppArmor, Ubuntu 24.04+)"
-  if [ -n "$SUDO" ] && command -v apparmor_parser >/dev/null 2>&1; then
+  if [ -n "$NONINTERACTIVE" ]; then
+    warn "AppArmor profil chybí – spusť instalaci jednou ručně v terminálu."
+  elif [ -n "$SUDO" ] && command -v apparmor_parser >/dev/null 2>&1; then
     profile="abi <abi/4.0>,
 include <tunables/global>
 
@@ -192,7 +197,7 @@ fi
 
 # Report shared libraries Electron needs but the system lacks (rare on desktop installs).
 missing_libs="$(ldd "$APP_DIR/vimmi" 2>/dev/null | awk '/not found/ {print $1}' | sort -u | tr '\n' ' ')"
-if [ -n "$missing_libs" ]; then
+if [ -n "$missing_libs" ] && [ -z "$NONINTERACTIVE" ]; then
   step "Doinstalovávám knihovny, které Electron potřebuje"
   info "Chybí: $missing_libs"
   case "$PKG" in

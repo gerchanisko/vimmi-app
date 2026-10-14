@@ -114,6 +114,11 @@ const server = http.createServer((req, res) => {
   let body = "";
   req.on("data", (c) => (body += c));
   req.on("end", () => {
+    if (req.url === "/release/latest") {
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ tag_name: "v9.9.9" }));
+      return;
+    }
     if (req.method === "GET" && req.url.startsWith("/v1/models/")) {
       res.writeHead(200, { "content-type": "application/json" });
       res.end(JSON.stringify({ id: "claude-sonnet-5-5", display_name: "Claude Sonnet 5.5", type: "model", created_at: "2026-01-01T00:00:00Z" }));
@@ -167,6 +172,10 @@ const app = await electron.launch({
     ANTHROPIC_BASE_URL: apiUrl,
     OPENAI_API_KEY: "sk-openai-test",
     VIMMI_OPENAI_BASE_URL: `${apiUrl}/v1`,
+    // Updates: pretend to be an install.sh install, with a fake release feed and installer.
+    VIMMI_UPDATE_METHOD: "script",
+    VIMMI_UPDATE_FEED: `${apiUrl}/release/latest`,
+    VIMMI_UPDATE_COMMAND: "echo instaluji; sleep 1",
   },
 });
 const page = await app.firstWindow();
@@ -352,6 +361,17 @@ try {
     await page.click(".menu >> text=Shrnout");
     await page.waitForSelector(".quick-panel >> text=Shrnutí (OpenAI)", { timeout: 10000 });
     await page.click(".quick-panel >> text=Zahodit");
+  });
+
+  await step("finds a new version, installs it in the background and offers a restart", async () => {
+    await page.keyboard.press("Control+,");
+    await page.click(".settings-nav >> text=O aplikaci");
+    await page.click("text=Zkontrolovat aktualizace");
+    await page.waitForSelector(".update-banner >> text=Vimmi 9.9.9 je připravené", { timeout: 20000 });
+    await page.waitForSelector("text=Restartovat a aktualizovat");
+    await shot("18-update-ready");
+    await page.keyboard.press("Escape");
+    await page.click(".update-banner button[aria-label='Později']");
   });
 
   await step("dark theme", async () => {

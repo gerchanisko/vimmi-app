@@ -14,6 +14,7 @@ import type {
   Settings,
   SyncSettings,
   SyncStatus,
+  UpdateStatus,
   VaultSnapshot,
 } from "../shared/types";
 
@@ -71,6 +72,13 @@ const api = {
     createRepo: (name: string) => invoke<{ owner: string; repo: string }>("sync:create-repo", name),
     configure: (patch: Partial<SyncSettings>) => invoke<Settings>("sync:configure", patch),
     onStatus: (cb: (s: SyncStatus) => void) => on("sync:status", cb),
+  },
+  update: {
+    status: () => invoke<UpdateStatus>("update:status"),
+    check: () => invoke<UpdateStatus>("update:check"),
+    install: () => invoke<void>("update:install"),
+    restart: () => invoke<void>("update:restart"),
+    onStatus: (cb: (s: UpdateStatus) => void) => on("update:status", cb),
   },
   ai: {
     chats: () => invoke<ChatSummary[]>("ai:chats"),

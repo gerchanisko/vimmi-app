@@ -56,12 +56,13 @@ jobs:
     strategy:
       matrix:
         include:
+          # latest*.yml tells installed apps (electron-updater) that a new version exists.
           - os: windows-latest
             build: npx electron-builder --win nsis --publish never
-            file: release/Vimmi-Setup.exe
+            files: release/Vimmi-Setup.exe release/Vimmi-Setup.exe.blockmap release/latest.yml
           - os: ubuntu-latest
             build: npx electron-builder --linux AppImage --publish never
-            file: release/Vimmi.AppImage
+            files: release/Vimmi.AppImage release/latest-linux.yml
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -79,4 +80,4 @@ jobs:
         run: |
           tag="v$(node -p "require('./package.json').version")"
           gh release view "$tag" >/dev/null 2>&1 || gh release create "$tag" --title "Vimmi $tag" --notes-file .github/release-notes.md || true
-          gh release upload "$tag" "${{ matrix.file }}" --clobber
+          gh release upload "$tag" ${{ matrix.files }} --clobber

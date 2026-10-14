@@ -8,7 +8,8 @@ const common = {
   target: "node22",
   format: "cjs",
   sourcemap: true,
-  external: ["electron"],
+  // electron-updater stays a normal dependency (it is packed into the app by electron-builder).
+  external: ["electron", "electron-updater"],
   logLevel: "info",
 };
 const entries = [
