@@ -401,7 +401,9 @@ try {
   await step("finds a new version, installs it in the background and offers a restart", async () => {
     await page.keyboard.press("Control+,");
     await page.click(".settings-nav >> text=O aplikaci");
-    await page.click("text=Zkontrolovat aktualizace");
+    // The automatic check (15 s after start) may already have found it.
+    const check = page.locator("text=Zkontrolovat aktualizace");
+    if (await check.isVisible()) await check.click();
     await page.waitForSelector(".update-banner >> text=Vimmi 9.9.9 je připravené", { timeout: 20000 });
     await page.waitForSelector("text=Restartovat a aktualizovat");
     await shot("18-update-ready");
