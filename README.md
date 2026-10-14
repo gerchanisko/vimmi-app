@@ -168,4 +168,4 @@ test/                   unit testy (Vitest) a smoke test (Playwright + Electron)
 
 ## Licence
 
-Licence aplikace zatím nebyla zvolena. Písmo Inter je pod licencí SIL Open Font License 1.1 (viz `src/assets/Inter-LICENSE.txt`).
+Vimmi je svobodný software pod licencí [GNU General Public License v3.0 nebo novější](LICENSE) (GPL-3.0-or-later). Můžeš ho používat, upravovat a šířit, ale upravené verze musí zůstat pod stejnou licencí a se zdrojovým kódem. Písmo Inter je pod licencí SIL Open Font License 1.1 (viz `src/assets/Inter-LICENSE.txt`).
