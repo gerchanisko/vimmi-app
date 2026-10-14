@@ -5,10 +5,12 @@ import type Anthropic from "@anthropic-ai/sdk";
 import { addDays, basename, isoDate, joinPath, taskDisplayText } from "../markdown";
 import type { Task } from "../types";
 import { insertUnderHeading, Vault, VaultError } from "../vault";
+import { eventBody, eventFilePath, eventFromMeta, eventMarkdown, eventsFromNotes, occurrences, REPEAT_LABELS, type CalendarEvent } from "../calendar";
 
 export interface ToolEnv {
   vault: Vault;
   dailyFolder: string;
+  calendarFolder?: string;
   openNote: (path: string) => void;
 }
 
@@ -46,6 +48,39 @@ function taskLine(t: Task): string {
   if (t.project) bits.push(`projekt ${t.project}`);
   bits.push(`(${t.path}:${t.line})`);
   return bits.join(" · ");
+}
+
+const dateField = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "YYYY-MM-DD");
+const timeField = z.string().regex(/^([01]?\d|2[0-3]):[0-5]\d$/, "HH:MM");
+
+function plusHour(time: string): string {
+  const [h, m] = time.split(":").map(Number);
+  return `${String(Math.min(23, h + 1)).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
+
+function czechDate(date: string): string {
+  return new Date(`${date}T12:00:00`).toLocaleDateString("cs-CZ", { weekday: "long", day: "numeric", month: "numeric", year: "numeric" });
+}
+
+function describeOccurrence(date: string, e: CalendarEvent): string {
+  const when = e.allDay ? "celý den" : `${e.start}–${e.end}`;
+  const parts = [`${czechDate(date)} ${when}: ${e.title}`];
+  if (e.location) parts.push(`místo ${e.location}`);
+  if (e.repeat) parts.push(REPEAT_LABELS[e.repeat].toLowerCase());
+  return parts.join(" · ");
+}
+
+function describeInput(i: { title: string; date: string; start?: string; end?: string; location?: string; repeat?: string }): string {
+  const when = i.start ? `${i.start}${i.end ? `–${i.end}` : ""}` : "celý den";
+  return `${i.title}, ${czechDate(i.date)} ${when}${i.location ? `, ${i.location}` : ""}${i.repeat ? ` (${REPEAT_LABELS[i.repeat as keyof typeof REPEAT_LABELS]?.toLowerCase() ?? i.repeat})` : ""}`;
+}
+
+function existingEvent(env: ToolEnv, input: string): { path: string; event: CalendarEvent } {
+  const path = existing(env, input);
+  const meta = env.vault.meta(path);
+  const event = meta ? eventFromMeta(meta) : null;
+  if (!event) throw new VaultError(`„${input}“ není událost v kalendáři. Najdi ji přes list_events.`);
+  return { path, event };
 }
 
 export const TOOLS = [
@@ -341,6 +376,121 @@ export const TOOLS = [
       const p = existing(env, path);
       await env.vault.trash(p);
       return `${basename(p)} je v koši.`;
+    },
+  }),
+  // ----- calendar -----
+  def({
+    name: "list_events",
+    description:
+      "List calendar events between two dates (inclusive), including repeating events. Defaults to the next 7 days. Each line shows the note path needed by update_event / delete_event.",
+    schema: z.object({
+      from: dateField.optional().describe("YYYY-MM-DD, default today."),
+      to: dateField.optional().describe("YYYY-MM-DD, default from + 7 days."),
+    }),
+    write: false,
+    run: ({ from, to }, { vault }) => {
+      const start = from ?? isoDate();
+      const end = to ?? addDays(start, 7);
+      const occ = occurrences(eventsFromNotes(vault.metas()), start, end);
+      if (!occ.length) return `V kalendáři mezi ${start} a ${end} nic není.`;
+      return occ.map((o) => `- ${describeOccurrence(o.date, o.event)} (${o.event.path})`).join("\n");
+    },
+  }),
+  def({
+    name: "add_event",
+    description:
+      "Add an event to the calendar (doctor, meeting, birthday, trip…). Omit start/end for an all-day event. end_date makes a multi-day all-day event. repeat makes it recurring.",
+    schema: z.object({
+      title: z.string().min(1),
+      date: dateField,
+      start: timeField.optional().describe("HH:MM, 24h"),
+      end: timeField.optional().describe("HH:MM; default one hour after start"),
+      end_date: dateField.optional(),
+      location: z.string().optional(),
+      description: z.string().optional(),
+      repeat: z.enum(["daily", "weekly", "monthly", "yearly"]).optional(),
+      until: dateField.optional(),
+      remind: z.number().int().min(0).max(10080).optional().describe("Minutes before start to remind (timed events). Default 15."),
+    }),
+    write: true,
+    preview: (input) => ({ summary: `Přidat do kalendáře: ${describeInput(input)}` }),
+    run: async (input, env) => {
+      const folder = env.calendarFolder ?? "Kalendář";
+      const timed = Boolean(input.start);
+      const content = eventMarkdown({
+        title: input.title,
+        date: input.date,
+        endDate: input.end_date,
+        start: input.start,
+        end: input.end ?? (input.start ? plusHour(input.start) : undefined),
+        allDay: !timed,
+        location: input.location,
+        description: input.description,
+        repeat: input.repeat,
+        until: input.until,
+        remind: timed ? (input.remind ?? 15) : undefined,
+      });
+      const p = await env.vault.create(eventFilePath(folder, input), content);
+      return `Přidáno do kalendáře: ${describeInput(input)} (${p})`;
+    },
+  }),
+  def({
+    name: "update_event",
+    description: "Change a calendar event: move it to another date or time, rename it, change place, repeat or reminder. Pass only the fields that change.",
+    schema: z.object({
+      path: z.string(),
+      title: z.string().optional(),
+      date: dateField.optional(),
+      start: timeField.optional(),
+      end: timeField.optional(),
+      all_day: z.boolean().optional(),
+      location: z.string().optional(),
+      description: z.string().optional(),
+      repeat: z.enum(["daily", "weekly", "monthly", "yearly", "none"]).optional(),
+      remind: z.number().int().min(0).max(10080).optional(),
+    }),
+    write: true,
+    preview: (input, env) => {
+      const { event } = existingEvent(env, input.path);
+      return { summary: `Upravit událost „${event.title}“ (${describeOccurrence(event.date, event)})` };
+    },
+    run: async (input, env) => {
+      const { path, event } = existingEvent(env, input.path);
+      const allDay = input.all_day ?? (input.start ? false : event.allDay);
+      const start = allDay ? undefined : (input.start ?? event.start ?? "09:00");
+      const content = eventMarkdown(
+        {
+          title: input.title ?? event.title,
+          date: input.date ?? event.date,
+          endDate: event.endDate,
+          start,
+          end: allDay ? undefined : (input.end ?? (input.start && !input.end ? plusHour(input.start) : event.end)),
+          allDay,
+          location: input.location ?? event.location,
+          repeat: input.repeat === "none" ? undefined : (input.repeat ?? event.repeat),
+          until: event.until,
+          remind: input.remind ?? event.remind,
+          color: event.color,
+        },
+        input.description !== undefined ? `\n${input.description}\n` : eventBody(env.vault.read(path)),
+      );
+      await env.vault.write(path, content);
+      return `Událost upravena (${path}).`;
+    },
+  }),
+  def({
+    name: "delete_event",
+    description: "Remove a calendar event (moves its note to the trash).",
+    schema: z.object({ path: z.string() }),
+    write: true,
+    preview: (input, env) => {
+      const { event } = existingEvent(env, input.path);
+      return { summary: `Smazat událost „${event.title}“ (${describeOccurrence(event.date, event)})` };
+    },
+    run: async (input, env) => {
+      const { path, event } = existingEvent(env, input.path);
+      await env.vault.trash(path);
+      return `Událost „${event.title}“ je smazaná.`;
     },
   }),
 ];

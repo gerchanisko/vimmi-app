@@ -2,8 +2,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { addDays, basename, isoDate, taskDisplayText } from "../../shared/markdown";
 import type { NoteMeta, Priority, SearchHit, Task } from "../../shared/types";
+import { eventsFromNotes, occurrences } from "../../shared/calendar";
+import { COLOR_VAR } from "./Calendar";
 import { askAi, openDaily, toggleTask } from "../lib/actions";
-import { errorText, openNote, prompt, refreshSnapshot, toast, useApp } from "../lib/store";
+import { errorText, openNote, openView, prompt, refreshSnapshot, toast, useApp } from "../lib/store";
 import { Icon } from "./Icon";
 
 // ---------- shared task row ----------
@@ -119,6 +121,7 @@ export function TodayView() {
   const greeting = hour < 10 ? "Dobré ráno" : hour < 18 ? "Dobrý den" : "Dobrý večer";
   const longDate = new Date().toLocaleDateString("cs-CZ", { weekday: "long", day: "numeric", month: "long" });
   const totalToday = overdue.length + dueToday.length;
+  const agenda = useMemo(() => occurrences(eventsFromNotes(notes), today, addDays(today, 1)), [notes, today]);
 
   return (
     <div className="view today-view">
@@ -142,6 +145,22 @@ export function TodayView() {
 
       <QuickAddTask defaultDue={today} />
 
+      {agenda.length > 0 && (
+        <section className="task-group today-events">
+          <h2>V kalendáři</h2>
+          {agenda.map((o, i) => (
+            <button key={i} className="cal-agenda-item" style={{ "--ev": COLOR_VAR[o.event.color] } as React.CSSProperties} onClick={() => openView("calendar")}>
+              <span className="cal-agenda-time">
+                {o.date === today ? "Dnes" : "Zítra"} {o.startMin === undefined ? "celý den" : `${o.event.start}–${o.event.end}`}
+              </span>
+              <span className="cal-agenda-title">
+                {o.event.title}
+                {o.event.location && <span className="muted"> · {o.event.location}</span>}
+              </span>
+            </button>
+          ))}
+        </section>
+      )}
       {overdue.length > 0 && (
         <section className="task-group">
           <h2>Po termínu</h2>

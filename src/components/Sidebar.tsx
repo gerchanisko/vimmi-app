@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { basename, dirname, isoDate } from "../../shared/markdown";
 import type { NoteMeta } from "../../shared/types";
-import { movePath, newFolder, newNote, openDaily, renamePath, switchVault, toggleBookmark, trashPath } from "../lib/actions";
+import { movePath, newFolder, newNote, renamePath, switchVault, toggleBookmark, trashPath } from "../lib/actions";
 import { activeNotePath, openNote, openView, setState, useApp } from "../lib/store";
 import { Icon, Logo } from "./Icon";
 import { openMenu } from "./Menu";
@@ -197,6 +197,9 @@ export default function Sidebar() {
         <button className={`nav-item${activeView === "today" ? " active" : ""}`} onClick={() => openView("today")}>
           <Icon name="today" /> Dnes {openToday > 0 && <span className="count">{openToday}</span>}
         </button>
+        <button className={`nav-item${activeView === "calendar" ? " active" : ""}`} onClick={() => openView("calendar")}>
+          <Icon name="calendar" /> Kalendář
+        </button>
         <button className={`nav-item${activeView === "tasks" ? " active" : ""}`} onClick={() => openView("tasks")}>
           <Icon name="task" /> Úkoly
         </button>
@@ -205,9 +208,6 @@ export default function Sidebar() {
         </button>
         <button className={`nav-item${activeView === "graph" ? " active" : ""}`} onClick={() => openView("graph")}>
           <Icon name="graph" /> Graf
-        </button>
-        <button className="nav-item" onClick={() => void openDaily()}>
-          <Icon name="calendar" /> Deník <kbd>Ctrl D</kbd>
         </button>
       </nav>
 

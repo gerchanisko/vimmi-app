@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { basename } from "../shared/markdown";
 import { AiQuickPanel } from "./components/AiQuick";
+import CalendarView from "./components/Calendar";
 import GraphView from "./components/GraphView";
 import { Icon } from "./components/Icon";
 import { MenuHost, openMenu } from "./components/Menu";
@@ -16,11 +17,13 @@ import { isMobile, useMobile } from "./lib/mobile";
 import { SyncIndicator } from "./components/Sync";
 import { UpdateBanner } from "./components/Update";
 import { handleShortcut } from "./lib/commands";
+import { startReminders } from "./lib/reminders";
 import { flushAll, reloadDoc } from "./lib/docs";
 import { closeTab, getState, openNote, openView, refreshSnapshot, setState, useApp, type Tab } from "./lib/store";
 
 const VIEW_TITLES: Record<string, [string, string]> = {
   today: ["Dnes", "today"],
+  calendar: ["Kalendář", "calendar"],
   tasks: ["Úkoly", "task"],
   projects: ["Projekty", "project"],
   graph: ["Graf", "graph"],
@@ -35,6 +38,8 @@ export default function App() {
   const theme = useApp((s) => s.settings?.theme ?? "system");
 
   // Boot: load settings and the last vault.
+  useEffect(() => startReminders(), []);
+
   useEffect(() => {
     void (async () => {
       const settings = await window.vimmi.settings.get();
@@ -143,16 +148,16 @@ function Workspace() {
               <Icon name="today" size={22} />
               <span>Dnes</span>
             </button>
-            <button className={tab?.kind === "view" && tab.view === "tasks" ? "on" : ""} onClick={() => openView("tasks")}>
-              <Icon name="task" size={22} />
-              <span>Úkoly</span>
+            <button className={tab?.kind === "view" && tab.view === "calendar" ? "on" : ""} onClick={() => openView("calendar")}>
+              <Icon name="calendar" size={22} />
+              <span>Kalendář</span>
             </button>
             <button className="bottom-new" onClick={() => void newNote()} aria-label="Nová poznámka">
               <Icon name="plus" size={24} />
             </button>
-            <button onClick={() => setState({ overlay: { type: "spotlight" } })}>
-              <Icon name="search" size={22} />
-              <span>Hledat</span>
+            <button className={tab?.kind === "view" && tab.view === "tasks" ? "on" : ""} onClick={() => openView("tasks")}>
+              <Icon name="task" size={22} />
+              <span>Úkoly</span>
             </button>
             <button className={right === "ai" ? "on" : ""} onClick={() => toggleRight("ai")}>
               <Icon name="sparkle" size={22} />
@@ -249,6 +254,8 @@ function TabContent({ tab, active }: { tab: Tab; active: boolean }) {
   switch (tab.view) {
     case "today":
       return <TodayView />;
+    case "calendar":
+      return <CalendarView />;
     case "tasks":
       return <TasksView />;
     case "projects":

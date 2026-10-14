@@ -265,6 +265,9 @@ function createWindow(): void {
   win.on("closed", () => (win = undefined));
 }
 
+// Czech date and time pickers (24-hour clock) regardless of the system language.
+app.commandLine.appendSwitch("lang", "cs-CZ");
+
 // Windows groups taskbar buttons and shortcuts by this id (same as build.appId).
 if (process.platform === "win32") app.setAppUserModelId("io.github.gerchanisko.vimmi");
 

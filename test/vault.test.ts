@@ -117,4 +117,21 @@ describe("AI tools", () => {
     await TOOL_MAP.create_note.run({ path: "Nové/Test", content: "ahoj" }, env());
     expect(vault.read("Nové/Test.md")).toBe("ahoj");
   });
+
+  it("calendar tools add, list, move and delete events", async () => {
+    const env2 = { ...env(), calendarFolder: "Kalendář" };
+    const added = await TOOL_MAP.add_event.run({ title: "Doktor", date: "2026-10-15", start: "10:00", location: "Poliklinika" }, env2);
+    expect(added).toContain("Kalendář/2026-10-15 Doktor.md");
+    const text = vault.read("Kalendář/2026-10-15 Doktor.md");
+    expect(text).toContain('start: "10:00"');
+    expect(text).toContain('end: "11:00"');
+    expect(text).toContain("remind: 15");
+    expect(await TOOL_MAP.list_events.run({ from: "2026-10-14", to: "2026-10-16" }, env2)).toContain("10:00–11:00: Doktor");
+    await TOOL_MAP.update_event.run({ path: "Kalendář/2026-10-15 Doktor.md", date: "2026-10-16", start: "14:30" }, env2);
+    expect(await TOOL_MAP.list_events.run({ from: "2026-10-16", to: "2026-10-16" }, env2)).toContain("14:30–15:30: Doktor");
+    await TOOL_MAP.add_event.run({ title: "Narozeniny mámy", date: "2026-11-02", repeat: "yearly" }, env2);
+    expect(await TOOL_MAP.list_events.run({ from: "2027-11-01", to: "2027-11-03" }, env2)).toContain("celý den: Narozeniny mámy");
+    await TOOL_MAP.delete_event.run({ path: "Kalendář/2026-10-15 Doktor.md" }, env2);
+    expect(await TOOL_MAP.list_events.run({ from: "2026-10-16", to: "2026-10-16" }, env2)).toContain("nic není");
+  });
 });

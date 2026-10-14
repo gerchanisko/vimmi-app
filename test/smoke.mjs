@@ -263,6 +263,41 @@ try {
     await shot("08-graph");
   });
 
+  await step("calendar: new event, drag to another time, month and list views", async () => {
+    await page.click(".side-nav >> text=Kalendář");
+    const cal = page.locator(".tab-pane:not([hidden]) .calendar");
+    await cal.locator(".segmented >> text=Týden").click();
+    await cal.locator(".cal-toolbar >> text=Událost").click();
+    await page.fill(".event-dialog .event-title-input", "Zubař");
+    await page.fill(".event-dialog input[placeholder='Místo']", "Poliklinika");
+    await page.click(".event-dialog >> text=Uložit");
+    await page.waitForTimeout(500);
+    const today = new Date();
+    const iso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+    const file = path.join("Kalendář", `${iso} Zubař.md`);
+    if (!/start: "09:00"[\s\S]*location: Poliklinika/.test(read(file))) throw new Error(`event not saved:\n${read(file)}`);
+    const ev = cal.locator(".cal-event", { hasText: "Zubař" });
+    await ev.scrollIntoViewIfNeeded();
+    const box = await ev.boundingBox();
+    await page.mouse.move(box.x + box.width / 2, box.y + 10);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width / 2, box.y + 34, { steps: 4 });
+    await page.mouse.move(box.x + box.width / 2, box.y + 58, { steps: 4 });
+    await page.mouse.up();
+    await page.waitForTimeout(600);
+    if (!read(file).includes('start: "10:00"')) throw new Error(`drag did not move the event:\n${read(file)}`);
+    await shot("19-calendar-week");
+    await cal.locator(".segmented >> text=Měsíc").click();
+    await cal.locator(".cal-month .cal-chip", { hasText: "Zubař" }).waitFor();
+    await shot("20-calendar-month");
+    await cal.locator(".segmented >> text=Seznam").click();
+    await cal.locator(".cal-agenda-item", { hasText: "Zubař" }).click();
+    await page.waitForSelector(".event-dialog");
+    await shot("21-calendar-event");
+    await page.keyboard.press("Escape");
+    await cal.locator(".segmented >> text=Týden").click();
+  });
+
   await step("command palette (Ctrl+P)", async () => {
     await page.keyboard.press("Control+p");
     await page.keyboard.type("denni");

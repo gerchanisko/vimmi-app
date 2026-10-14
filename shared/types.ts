@@ -89,6 +89,7 @@ export interface Settings {
   webSearch: boolean;
   showThinking: boolean;
   dailyFolder: string;
+  calendarFolder: string;
   attachmentsFolder: string;
   templatesFolder: string;
   fontSize: number;
@@ -147,6 +148,7 @@ export const DEFAULT_SETTINGS: Settings = {
   webSearch: false,
   showThinking: true,
   dailyFolder: "Deník",
+  calendarFolder: "Kalendář",
   attachmentsFolder: "Přílohy",
   templatesFolder: "Šablony",
   fontSize: 16,

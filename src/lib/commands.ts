@@ -44,6 +44,7 @@ export const COMMANDS: Command[] = [
   { id: "daily-yesterday", label: "Včerejší poznámka", icon: "calendar", run: () => void openDaily(-1) },
   { id: "daily-tomorrow", label: "Zítřejší poznámka", icon: "calendar", run: () => void openDaily(1) },
   { id: "today", label: "Přehled Dnes", icon: "today", keys: "Mod+Shift+T", shortcut: "Ctrl+Shift+T", run: () => openView("today") },
+  { id: "calendar", label: "Kalendář", icon: "calendar", keys: "Mod+Shift+K", shortcut: "Ctrl+Shift+K", keywords: "calendar události schůzky", run: () => openView("calendar") },
   { id: "tasks", label: "Všechny úkoly", icon: "task", keys: "Mod+Shift+U", shortcut: "Ctrl+Shift+U", run: () => openView("tasks") },
   { id: "projects", label: "Projekty", icon: "project", run: () => openView("projects") },
   { id: "graph", label: "Graf souvislostí", icon: "graph", keys: "Mod+G", shortcut: "Ctrl+G", run: () => openView("graph") },

@@ -66,6 +66,8 @@ import {
   Trash2,
   X,
   type LucideIcon,
+  Bell,
+  MapPin,
 } from "lucide-react";
 
 const ICONS: Record<string, LucideIcon> = {
@@ -136,6 +138,8 @@ const ICONS: Record<string, LucideIcon> = {
   tag: Tag,
   trash: Trash2,
   close: X,
+  bell: Bell,
+  "map-pin": MapPin,
 };
 
 export function Icon({ name, size = 16, className }: { name: string; size?: number; className?: string }) {

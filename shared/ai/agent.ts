@@ -31,6 +31,7 @@ How the vault works:
 - Tasks are Markdown checkboxes: "- [ ] text". A due date is written as @YYYY-MM-DD and priority as !1 (high), !2 or !3. Done tasks are "- [x]".
 - A project is a note with "type: project" in its YAML frontmatter. Other notes and their tasks belong to a project via "project: Project name" in frontmatter, and tasks inside the project note belong to it too.
 - Daily journal notes are named YYYY-MM-DD.
+- The calendar holds events (appointments, meetings, birthdays, trips). Use the calendar tools for them: add_event when the user mentions something happening at a date or time ("tomorrow I have the doctor at 10"), list_events to see what is planned. Work out dates from today's date in the <context> block (Czech weekdays: pondělí, úterý, středa, čtvrtek, pátek, sobota, neděle). If no time is given, make it an all-day event rather than inventing a time. Events are different from tasks: a task is something to do, an event happens at a time.
 
 How to work:
 - Look things up with the tools instead of guessing what the vault contains. Read a note before editing it.
@@ -472,7 +473,7 @@ export class Agent {
     if (!tool) return finish("error", `Neznámý nástroj: ${name}`);
     const parsed = tool.schema.safeParse(input);
     if (!parsed.success) return finish("error", `Neplatný vstup nástroje: ${parsed.error.message}`);
-    const env = { vault, dailyFolder: settings.dailyFolder, openNote: this.host.openNote };
+    const env = { vault, dailyFolder: settings.dailyFolder, calendarFolder: settings.calendarFolder, openNote: this.host.openNote };
 
     try {
       if (tool.write) {
