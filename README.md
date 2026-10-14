@@ -49,6 +49,16 @@ Otevři **<https://gerchanisko.github.io/vimmi-app/>** v Safari (na Androidu v C
 
 Připravujeme. Do té doby funguje webová aplikace.
 
+## Aktualizace
+
+Vimmi se aktualizuje samo (od verze 0.2.2):
+
+- **Windows** a **Linux AppImage** stáhnou novou verzi z GitHub Releases na pozadí a nainstalují ji po restartu.
+- **Linux z instalačního skriptu** spustí instalaci nové verze na pozadí a pak nabídne restart.
+- **Webová aplikace** (iPhone, Android) se obnoví na novou verzi při příštím návratu do aplikace.
+
+Ručně: *Nastavení → O aplikaci → Zkontrolovat aktualizace*. Tamtéž se dají automatické aktualizace vypnout.
+
 ## Synchronizace
 
 Poznámky se synchronizují přes **soukromý repozitář na tvém GitHubu** – mezi počítači, telefonem i tabletem. Zdarma, s celou historií změn a bez dalšího účtu.
