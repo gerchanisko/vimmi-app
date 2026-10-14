@@ -1,7 +1,7 @@
 {
   "name": "vimmi",
   "productName": "Vimmi",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Poznámky, úkoly a projekty na jednom klidném místě – s AI asistentem Claude.",
   "author": "gerchanisko",
   "private": true,
@@ -16,7 +16,10 @@
     "install-desktop": "node scripts/install-linux.mjs",
     "screenshots": "npm run build && node scripts/screenshots.mjs docs/screenshots",
     "dist:win": "npm run build && electron-builder --win nsis --publish never",
-    "dist:linux": "npm run build && electron-builder --linux AppImage --publish never"
+    "dist:linux": "npm run build && electron-builder --linux AppImage --publish never",
+    "build:web": "tsc --noEmit -p . && vite build --config vite.web.config.mts",
+    "dev:web": "vite --config vite.web.config.mts",
+    "sync-e2e": "npm run build && npm run build:web && node test/sync-e2e.mjs"
   },
   "build": {
     "appId": "io.github.gerchanisko.vimmi",
@@ -67,7 +70,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.133.0",
-    "gray-matter": "^4.0.3",
+    "js-yaml": "^5.4.3",
     "markdown-it": "^15.0.2",
     "openai": "^7.32.0",
     "zod": "^4.6.7"

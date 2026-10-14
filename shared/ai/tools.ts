@@ -2,8 +2,8 @@
 // write tools describe their change first so the user can approve it.
 import { z } from "zod";
 import type Anthropic from "@anthropic-ai/sdk";
-import { addDays, basename, isoDate, joinPath, taskDisplayText } from "../../shared/markdown";
-import type { Task } from "../../shared/types";
+import { addDays, basename, isoDate, joinPath, taskDisplayText } from "../markdown";
+import type { Task } from "../types";
 import { insertUnderHeading, Vault, VaultError } from "../vault";
 
 export interface ToolEnv {

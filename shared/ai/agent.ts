@@ -1,11 +1,8 @@
 // AI integration: the chat agent with vault tools, quick actions, and chat storage.
 // Claude runs through the Anthropic SDK; other providers through ./openai-loops.
-import fs from "node:fs";
-import path from "node:path";
-import { randomUUID } from "node:crypto";
 import Anthropic from "@anthropic-ai/sdk";
 import OpenAI from "openai";
-import { isoDate } from "../../shared/markdown";
+import { isoDate } from "../markdown";
 import type {
   AiEvent,
   Chat,
@@ -16,9 +13,9 @@ import type {
   QuickEvent,
   QuickRequest,
   Settings,
-} from "../../shared/types";
+} from "../types";
 import type { Vault } from "../vault";
-import { PROVIDER_MAP, providerBaseUrl, providerModel, type ProviderId, type ProviderKind } from "../../shared/providers";
+import { PROVIDER_MAP, providerBaseUrl, providerModel, type ProviderId, type ProviderKind } from "../providers";
 import { friendlyOpenAIError, runChatLoop, runResponsesLoop, streamText } from "./openai-loops";
 import { TOOL_MAP, toolDefinitions } from "./tools";
 
@@ -112,7 +109,8 @@ export class Agent {
   private client(): Anthropic {
     const apiKey = this.host.apiKey("anthropic");
     if (!apiKey) throw new Error("Nejdřív vlož Claude API klíč v Nastavení → AI.");
-    return new Anthropic({ apiKey });
+    // The web app calls the API straight from the browser with the user's own key.
+    return new Anthropic({ apiKey, dangerouslyAllowBrowser: true });
   }
 
   private openaiClient(provider: ProviderId): OpenAI {
@@ -120,10 +118,11 @@ export class Agent {
     const apiKey = this.host.apiKey(provider);
     if (info.needsKey && !apiKey) throw new Error(`Nejdřív vlož API klíč pro ${info.name} v Nastavení → AI.`);
     // VIMMI_<PROVIDER>_BASE_URL lets tests and developers point a provider at another server.
-    const baseURL = process.env[`VIMMI_${provider.toUpperCase()}_BASE_URL`] || providerBaseUrl(provider, this.host.settings().baseUrls);
+    const env = typeof process !== "undefined" ? process.env : {};
+    const baseURL = env[`VIMMI_${provider.toUpperCase()}_BASE_URL`] || providerBaseUrl(provider, this.host.settings().baseUrls);
     if (!baseURL) throw new Error(`Nastav adresu serveru pro ${info.name} v Nastavení → AI.`);
     // Local servers (Ollama, LM Studio) accept any key, but the SDK requires one.
-    return new OpenAI({ apiKey: apiKey || "not-needed", baseURL });
+    return new OpenAI({ apiKey: apiKey || "not-needed", baseURL, dangerouslyAllowBrowser: true });
   }
 
   private activeModel(provider: ProviderId): string {
@@ -132,26 +131,20 @@ export class Agent {
     return model;
   }
 
-  // ---------- chat storage (inside the vault, in .vimmi/chats) ----------
+  // ---------- chat storage (inside the vault: .vimmi/chats on disk, IndexedDB in the browser) ----------
 
-  private chatDir(): string | undefined {
-    const vault = this.host.vault();
-    return vault ? path.join(vault.root, ".vimmi", "chats") : undefined;
+  private async persist(stored: StoredChat): Promise<void> {
+    await this.host.vault()?.storage.writePrivate(`chats/${stored.chat.id}.json`, JSON.stringify(stored));
   }
 
-  private persist(stored: StoredChat): void {
-    const dir = this.chatDir();
-    if (!dir) return;
-    fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(path.join(dir, `${stored.chat.id}.json`), JSON.stringify(stored));
-  }
-
-  private loadChat(id: string): StoredChat | undefined {
+  private async loadChat(id: string): Promise<StoredChat | undefined> {
     if (this.chats.has(id)) return this.chats.get(id);
-    const dir = this.chatDir();
-    if (!dir || !/^[\w-]+$/.test(id)) return undefined;
+    const vault = this.host.vault();
+    if (!vault || !/^[\w-]+$/.test(id)) return undefined;
     try {
-      const stored = JSON.parse(fs.readFileSync(path.join(dir, `${id}.json`), "utf8")) as StoredChat;
+      const raw = await vault.storage.readPrivate(`chats/${id}.json`);
+      if (!raw) return undefined;
+      const stored = JSON.parse(raw) as StoredChat;
       this.chats.set(id, stored);
       return stored;
     } catch {
@@ -164,34 +157,33 @@ export class Agent {
     this.chats.clear();
   }
 
-  listChats(): ChatSummary[] {
-    const dir = this.chatDir();
-    if (!dir || !fs.existsSync(dir)) return [];
+  async listChats(): Promise<ChatSummary[]> {
+    const vault = this.host.vault();
+    if (!vault) return [];
     const out: ChatSummary[] = [];
-    for (const f of fs.readdirSync(dir)) {
+    for (const f of await vault.storage.listPrivate("chats")) {
       if (!f.endsWith(".json")) continue;
-      const stored = this.loadChat(f.slice(0, -5));
+      const stored = await this.loadChat(f.slice(0, -5));
       if (stored) out.push({ id: stored.chat.id, title: stored.chat.title, updated: stored.chat.updated });
     }
     return out.sort((a, b) => b.updated - a.updated);
   }
 
-  getChat(id: string): Chat | undefined {
-    return this.loadChat(id)?.chat;
+  async getChat(id: string): Promise<Chat | undefined> {
+    return (await this.loadChat(id))?.chat;
   }
 
   newChat(): Chat {
     const now = Date.now();
-    const chat: Chat = { id: randomUUID(), title: "Nový chat", created: now, updated: now, messages: [] };
+    const chat: Chat = { id: crypto.randomUUID(), title: "Nový chat", created: now, updated: now, messages: [] };
     this.chats.set(chat.id, { chat, history: [], webSearch: this.host.settings().webSearch });
     return chat;
   }
 
-  deleteChat(id: string): void {
+  async deleteChat(id: string): Promise<void> {
     this.running.get(id)?.abort();
     this.chats.delete(id);
-    const dir = this.chatDir();
-    if (dir && /^[\w-]+$/.test(id)) fs.rmSync(path.join(dir, `${id}.json`), { force: true });
+    if (/^[\w-]+$/.test(id)) await this.host.vault()?.storage.deletePrivate(`chats/${id}.json`);
   }
 
   // ---------- chat turn ----------
@@ -208,7 +200,7 @@ export class Agent {
   private buildContext(ctx: ChatContext): string | undefined {
     const vault = this.host.vault();
     const lines = [`Dnešní datum: ${isoDate()} (${new Date().toLocaleDateString("cs-CZ", { weekday: "long" })})`];
-    if (vault) lines.push(`Trezor: ${path.basename(vault.root)} (${vault.metas().length} poznámek)`);
+    if (vault) lines.push(`Trezor: ${vault.name} (${vault.metas().length} poznámek)`);
     if (ctx.activePath && vault?.has(ctx.activePath)) {
       const content = vault.read(ctx.activePath);
       lines.push(`Otevřená poznámka: ${ctx.activePath}`);
@@ -220,7 +212,7 @@ export class Agent {
   }
 
   async send(convId: string, text: string, ctx: ChatContext): Promise<void> {
-    const stored = this.loadChat(convId);
+    const stored = await this.loadChat(convId);
     if (!stored) throw new Error("Chat nebyl nalezen.");
     if (this.running.has(convId)) throw new Error("AI ještě odpovídá.");
     const emit: Emit = (e) => this.host.emit({ ...e, convId } as AiEvent);
@@ -275,7 +267,7 @@ export class Agent {
         if (part.kind === "tool" && (part.status === "running" || part.status === "waiting")) part.status = "declined";
       }
       chat.updated = Date.now();
-      this.persist(stored);
+      await this.persist(stored).catch(() => {});
     }
   }
 

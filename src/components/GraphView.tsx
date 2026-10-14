@@ -245,9 +245,11 @@ export default function GraphView({ focus }: { focus?: string }) {
       draw();
     };
 
-    canvas.addEventListener("mousedown", onDown);
-    canvas.addEventListener("mousemove", onMove);
-    window.addEventListener("mouseup", onUp);
+    // Pointer events cover mouse, touch and pen.
+    canvas.style.touchAction = "none";
+    canvas.addEventListener("pointerdown", onDown);
+    canvas.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
     canvas.addEventListener("wheel", onWheel, { passive: false });
     const ro = new ResizeObserver(resize);
     ro.observe(wrap);
@@ -257,9 +259,9 @@ export default function GraphView({ focus }: { focus?: string }) {
     return () => {
       sim.stop();
       ro.disconnect();
-      canvas.removeEventListener("mousedown", onDown);
-      canvas.removeEventListener("mousemove", onMove);
-      window.removeEventListener("mouseup", onUp);
+      canvas.removeEventListener("pointerdown", onDown);
+      canvas.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
       canvas.removeEventListener("wheel", onWheel);
     };
   }, [data, current]);

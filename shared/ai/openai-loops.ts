@@ -2,7 +2,7 @@
 // - OpenAI itself via the Responses API (newer GPT models only support tools well there)
 // - Gemini, OpenRouter, Ollama and custom servers via OpenAI-compatible Chat Completions
 import OpenAI from "openai";
-import type { AiEvent, ChatMessage, ChatPart, Effort } from "../../shared/types";
+import type { AiEvent, ChatMessage, ChatPart, Effort } from "../types";
 import { functionSchemas } from "./tools";
 
 type EventBody = AiEvent extends infer E ? (E extends AiEvent ? Omit<E, "convId"> : never) : never;

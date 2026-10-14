@@ -2,6 +2,7 @@
 import { useSyncExternalStore } from "react";
 import { resolveLinkTarget } from "../../shared/markdown";
 import type { NoteMeta, Settings, VaultSnapshot } from "../../shared/types";
+import { isMobile } from "./mobile";
 
 export type ViewKind = "today" | "tasks" | "projects" | "graph" | "search" | "tag";
 export type Tab = { id: string; kind: "note"; path: string; mode: "edit" | "read" } | { id: string; kind: "view"; view: ViewKind; arg?: string };
@@ -118,7 +119,7 @@ export function restoreLayout(snapshot: VaultSnapshot): Partial<AppState> {
       tabs,
       active: tabs.some((t) => t.id === saved.active) ? saved.active : (tabs[0]?.id ?? null),
       right: saved.right ?? null,
-      leftOpen: saved.leftOpen ?? true,
+      leftOpen: isMobile() ? false : (saved.leftOpen ?? true),
       bookmarks: (saved.bookmarks ?? []).filter((b) => paths.has(b)),
     };
   } catch {
@@ -153,20 +154,23 @@ export function activeNotePath(): string | undefined {
 export function openNote(path: string, opts: { newTab?: boolean; line?: number; mode?: "edit" | "read" } = {}): void {
   setState((s) => {
     const jump = opts.line !== undefined ? { path, line: opts.line } : null;
+    // On a phone, opening something closes the drawer and the side panel.
+    const mobile = isMobile() ? { leftOpen: false, right: null } : {};
     const existing = s.tabs.find((t) => t.kind === "note" && t.path === path);
     if (existing) {
-      return { active: existing.id, jump, tabs: opts.mode ? s.tabs.map((t) => (t.id === existing.id ? { ...t, mode: opts.mode! } : t)) : s.tabs };
+      return { ...mobile, active: existing.id, jump, tabs: opts.mode ? s.tabs.map((t) => (t.id === existing.id ? { ...t, mode: opts.mode! } : t)) : s.tabs };
     }
     const tab: Tab = { id: newId(), kind: "note", path, mode: opts.mode ?? "edit" };
     const current = s.tabs.find((t) => t.id === s.active);
     if (!opts.newTab && current) {
-      return { tabs: s.tabs.map((t) => (t.id === current.id ? tab : t)), active: tab.id, jump };
+      return { ...mobile, tabs: s.tabs.map((t) => (t.id === current.id ? tab : t)), active: tab.id, jump };
     }
-    return { tabs: [...s.tabs, tab], active: tab.id, jump };
+    return { ...mobile, tabs: [...s.tabs, tab], active: tab.id, jump };
   });
 }
 
 export function openView(view: ViewKind, arg?: string): void {
+  if (isMobile()) setState({ leftOpen: false, right: null });
   setState((s) => {
     const existing = s.tabs.find((t) => t.kind === "view" && t.view === view);
     if (existing) {

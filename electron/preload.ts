@@ -12,6 +12,8 @@ import type {
   QuickRequest,
   SearchHit,
   Settings,
+  SyncSettings,
+  SyncStatus,
   VaultSnapshot,
 } from "../shared/types";
 
@@ -58,6 +60,17 @@ const api = {
     onChanged: (cb: () => void) => on<void>("vault:changed", cb),
     onNoteChanged: (cb: (info: { path: string; external: boolean }) => void) => on("vault:note-changed", cb),
     onOpenNote: (cb: (path: string) => void) => on("vault:open-note", cb),
+    /** URL for showing a vault file (image) in the page. */
+    fileUrl: (rel: string) => "vimmi-file://vault/" + rel.split("/").map(encodeURIComponent).join("/"),
+  },
+  sync: {
+    status: () => invoke<SyncStatus>("sync:status"),
+    now: () => invoke<SyncStatus>("sync:now"),
+    setToken: (token: string | null) => invoke<Settings>("sync:set-token", token),
+    user: () => invoke<string>("sync:user"),
+    createRepo: (name: string) => invoke<{ owner: string; repo: string }>("sync:create-repo", name),
+    configure: (patch: Partial<SyncSettings>) => invoke<Settings>("sync:configure", patch),
+    onStatus: (cb: (s: SyncStatus) => void) => on("sync:status", cb),
   },
   ai: {
     chats: () => invoke<ChatSummary[]>("ai:chats"),
@@ -76,7 +89,9 @@ const api = {
     openExternal: (url: string) => invoke<void>("app:open-external", url),
     exportPdf: (html: string, title: string) => invoke<string | null>("app:export-pdf", html, title),
     version: () => invoke<string>("app:version"),
-    platform: process.platform,
+    platform: process.platform as string,
+    /** "desktop" in Electron, "web" in the browser app. */
+    kind: "desktop" as "desktop" | "web",
   },
 };
 

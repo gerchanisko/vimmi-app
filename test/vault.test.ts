@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { insertUnderHeading, splitFrontmatter, Vault } from "../electron/vault";
-import { TOOL_MAP, toolDefinitions } from "../electron/ai/tools";
+import { TOOL_MAP, toolDefinitions } from "../shared/ai/tools";
 
 let dir: string;
 let vault: Vault;
@@ -79,7 +79,7 @@ describe("helpers", () => {
   it("splits frontmatter and reports body offset", () => {
     const r = splitFrontmatter("---\na: 1\nb: [x, y]\n---\nbody");
     expect(r).toEqual({ data: { a: 1, b: ["x", "y"] }, body: "body", offset: 4 });
-    expect(splitFrontmatter("---\n: : bad yaml [\n---\nx").data).toEqual({});
+    expect(splitFrontmatter("---\na: [unclosed\n---\nx").data).toEqual({});
   });
 
   it("inserts under headings", () => {

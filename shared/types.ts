@@ -97,10 +97,29 @@ export interface Settings {
   vimMode: boolean;
   livePreview: boolean;
   customInstructions: string;
+  /** GitHub sync of the vault (the token is stored separately, encrypted). */
+  sync: SyncSettings;
   /** Derived: the active provider has a key (or needs none). */
   hasApiKey: boolean;
   /** Derived: which providers have a stored key. */
   keys: Partial<Record<ProviderId, boolean>>;
+  /** Derived: a GitHub token is stored for sync. */
+  hasSyncToken: boolean;
+}
+
+export interface SyncSettings {
+  enabled: boolean;
+  owner: string;
+  repo: string;
+  branch?: string;
+}
+
+export interface SyncStatus {
+  state: "off" | "idle" | "syncing" | "error";
+  lastSync?: number;
+  message?: string;
+  /** Summary of the last sync that changed something. */
+  lastChange?: { pulled: number; pushed: number; deleted: number; conflicts: string[]; at: number };
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -123,8 +142,10 @@ export const DEFAULT_SETTINGS: Settings = {
   vimMode: false,
   livePreview: true,
   customInstructions: "",
+  sync: { enabled: false, owner: "", repo: "vimmi-poznamky" },
   hasApiKey: false,
   keys: {},
+  hasSyncToken: false,
 };
 
 // ---- AI chat ----

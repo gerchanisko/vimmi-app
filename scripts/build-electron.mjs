@@ -16,6 +16,8 @@ const entries = [
   { ...common, entryPoints: ["electron/preload.ts"], outfile: "dist-electron/preload.js" },
   // Used by test/smoke.mjs to create the starter vault.
   { ...common, entryPoints: ["test/fixtures/sample-vault.ts"], outfile: "dist-electron/sample-for-test.cjs", sourcemap: false },
+  // Used by test/sync-e2e.mjs.
+  { ...common, entryPoints: ["test/fake-github.ts"], outfile: "dist-electron/fake-github-for-test.mjs", format: "esm", sourcemap: false },
 ];
 
 if (watch) {

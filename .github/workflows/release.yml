@@ -28,12 +28,19 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run build
+      - run: npm run build:web
       - name: Smoke test (Windows)
         if: runner.os == 'Windows'
         run: node test/smoke.mjs test/screenshots
       - name: Smoke test (Linux)
         if: runner.os == 'Linux'
         run: xvfb-run -a node test/smoke.mjs test/screenshots
+      - name: Sync end-to-end test (Windows)
+        if: runner.os == 'Windows'
+        run: node test/sync-e2e.mjs test/screenshots
+      - name: Sync end-to-end test (Linux)
+        if: runner.os == 'Linux'
+        run: xvfb-run -a node test/sync-e2e.mjs test/screenshots
       - name: Upload screenshots
         if: always()
         uses: actions/upload-artifact@v4

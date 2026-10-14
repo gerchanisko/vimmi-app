@@ -5,6 +5,11 @@ import { movePath, newFolder, newNote, openDaily, renamePath, switchVault, toggl
 import { activeNotePath, openNote, openView, setState, useApp } from "../lib/store";
 import { Icon, Logo } from "./Icon";
 import { openMenu } from "./Menu";
+import { SyncIndicator } from "./Sync";
+import { isMobile } from "../lib/mobile";
+
+/** On a phone, choosing something in the drawer closes it. */
+const closeDrawer = () => (isMobile() ? { leftOpen: false } : {});
 
 interface TreeNode {
   name: string;
@@ -186,7 +191,7 @@ export default function Sidebar() {
       </div>
 
       <nav className="side-nav">
-        <button className="nav-item" onClick={() => setState({ overlay: { type: "spotlight" } })}>
+        <button className="nav-item" onClick={() => setState({ overlay: { type: "spotlight" }, ...closeDrawer() })}>
           <Icon name="search" /> Hledat <kbd>Ctrl K</kbd>
         </button>
         <button className={`nav-item${activeView === "today" ? " active" : ""}`} onClick={() => openView("today")}>
@@ -253,7 +258,8 @@ export default function Sidebar() {
       </div>
 
       <div className="side-foot">
-        <button className="nav-item" onClick={() => setState({ overlay: { type: "settings" } })}>
+        <SyncIndicator />
+        <button className="nav-item" onClick={() => setState({ overlay: { type: "settings" }, ...closeDrawer() })}>
           <Icon name="settings" /> Nastavení
         </button>
       </div>

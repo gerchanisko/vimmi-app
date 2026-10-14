@@ -7,7 +7,7 @@
 <p align="center"><strong>Všechno důležité. Na jednom místě.</strong><br>
 Poznámky, úkoly a projekty v jednom klidném prostoru – s AI asistentem.</p>
 
-<p align="center"><a href="https://gerchanisko.github.io/vimmi/">Web</a> · <a href="#instalace">Instalace</a> · <a href="#funkce">Funkce</a> · <a href="#ai-poskytovatelé">AI</a></p>
+<p align="center"><a href="https://gerchanisko.github.io/vimmi/">Web</a> · <a href="https://gerchanisko.github.io/vimmi-app/">Otevřít v prohlížeči</a> · <a href="#instalace">Instalace</a> · <a href="#synchronizace">Synchronizace</a> · <a href="#funkce">Funkce</a> · <a href="#ai-poskytovatelé">AI</a></p>
 
 Poznámky jsou obyčejné soubory Markdown ve složce (trezoru), takže jsou vždycky tvoje a funguje to i s trezorem z Obsidianu. AI asistent (Claude, OpenRouter, OpenAI, Gemini nebo lokální Ollama) umí v poznámkách hledat, shrnovat, plánovat a rovnou je upravovat.
 
@@ -41,9 +41,23 @@ Stáhni instalátor **[Vimmi-Setup.exe](https://github.com/gerchanisko/vimmi-app
 
 Instalátor zatím není digitálně podepsaný, takže Windows může zobrazit modré okno SmartScreen – klikni na **Další informace → Přesto spustit**. Aktualizace: stáhni a spusť novější instalátor. Odinstalace: *Nastavení → Aplikace → Vimmi*.
 
+### iPhone, iPad a Android (webová aplikace)
+
+Otevři **<https://gerchanisko.github.io/vimmi-app/>** v Safari (na Androidu v Chrome), klepni na **Sdílet → Přidat na plochu**. Vimmi pak běží jako aplikace přes celou obrazovku, funguje i offline a poznámky se ukládají v zařízení. S počítačem je propojíš přes [synchronizaci](#synchronizace).
+
 ### macOS
 
-Připravujeme.
+Připravujeme. Do té doby funguje webová aplikace.
+
+## Synchronizace
+
+Poznámky se synchronizují přes **soukromý repozitář na tvém GitHubu** – mezi počítači, telefonem i tabletem. Zdarma, s celou historií změn a bez dalšího účtu.
+
+1. Vytvoř soukromý repozitář, např. [`vimmi-poznamky`](https://github.com/new?name=vimmi-poznamky&visibility=private).
+2. Vytvoř [token](https://github.com/settings/personal-access-tokens/new) s přístupem jen k tomuto repozitáři a oprávněním *Contents: Read and write*.
+3. Ve Vimmi otevři **Nastavení → Synchronizace**, vlož token a repozitář a zapni synchronizaci. Totéž na dalších zařízeních.
+
+Synchronizuje se automaticky při spuštění, chvíli po úpravě, každé 2 minuty a při návratu do aplikace. Když stejnou poznámku upravíš na dvou zařízeních zároveň, nic se neztratí – druhá verze se uloží vedle jako „…(konflikt zařízení datum)“. Smazané poznámky jdou do koše. Token je na počítači zašifrovaný v systémové klíčence, v prohlížeči se ukládá v úložišti daného zařízení.
 
 ## Snímky
 
@@ -97,8 +111,8 @@ Připravujeme.
 - Klíče se zadávají v **Nastavení → AI**, každý poskytovatel má vlastní. Ukládají se zašifrovaně přes systémovou klíčenku (Electron `safeStorage`) a nikdy se nedostanou do okna aplikace; všechna volání API probíhají v hlavním procesu.
 - Pro vývoj fungují proměnné `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY`, `OPENROUTER_API_KEY` a `VIMMI_<POSKYTOVATEL>_BASE_URL` pro jiný server.
 - Názvy modelů se často mění, proto tlačítko **Načíst modely** stáhne aktuální seznam přímo od poskytovatele.
-- Nástroje AI jsou v [`electron/ai/tools.ts`](electron/ai/tools.ts) a sdílí je všichni poskytovatelé. Nový nástroj přidáš jedním záznamem `def({...})` se schématem v Zodu; u zapisujících nastavíš `write: true` a `preview`, aby šly schválit.
-- Smyčky: Claude v [`electron/ai/agent.ts`](electron/ai/agent.ts), ostatní v [`electron/ai/openai-loops.ts`](electron/ai/openai-loops.ts). Když v rozběhnutém chatu změníš poskytovatele, konverzace se převezme jako text.
+- Nástroje AI jsou v [`shared/ai/tools.ts`](shared/ai/tools.ts) a sdílí je všichni poskytovatelé. Nový nástroj přidáš jedním záznamem `def({...})` se schématem v Zodu; u zapisujících nastavíš `write: true` a `preview`, aby šly schválit.
+- Smyčky: Claude v [`shared/ai/agent.ts`](shared/ai/agent.ts), ostatní v [`shared/ai/openai-loops.ts`](shared/ai/openai-loops.ts). Když v rozběhnutém chatu změníš poskytovatele, konverzace se převezme jako text.
 
 ## Vývoj
 
@@ -107,8 +121,11 @@ Potřebuješ Node.js 22+.
 ```bash
 npm install
 npm run dev        # vývojový režim s automatickým načítáním
+npm run dev:web    # webová aplikace v prohlížeči
+npm run build:web  # webová aplikace (PWA) do dist-web/
 npm start          # sestaví a spustí aplikaci
 npm test           # unit testy (parser, trezor, AI nástroje)
+npm run sync-e2e   # end-to-end test synchronizace: počítač ↔ telefon (webová verze) přes falešný GitHub
 npm run smoke      # end-to-end test: spustí aplikaci, proklikne funkce, AI (Claude, OpenAI, kompatibilní) proti mock serverům
 npm run install-desktop   # sestaví a nainstaluje do nabídky aplikací (po změnách v kódu)
 npm run dist:win   # instalátor pro Windows do release/ (na Windows)
@@ -125,13 +142,15 @@ GitHub Actions ([`.github/workflows/release.yml`](.github/workflows/release.yml)
 install.sh              instalační skript pro Linux
 electron/main.ts        hlavní proces: okno, IPC, otevírání trezoru, deník, šablony, PDF
 electron/preload.ts     bezpečné API pro okno (window.vimmi)
-electron/vault.ts       trezor v paměti + sledování disku, hledání, přejmenování s opravou odkazů
+electron/node-storage.ts  úložiště trezoru na disku se sledováním změn
 electron/settings.ts    nastavení a zašifrovaný API klíč
-electron/ai/agent.ts    AI chat s nástroji, schvalování změn, rychlé akce, historie; smyčka pro Claude
-electron/ai/openai-loops.ts  smyčky pro OpenAI (Responses) a OpenAI-kompatibilní servery
 shared/providers.ts     seznam poskytovatelů, výchozí modely, adresy
-electron/ai/tools.ts    nástroje pro práci s trezorem
+shared/ai/tools.ts    nástroje pro práci s trezorem
+shared/vault.ts         jádro trezoru nezávislé na úložišti (disk na počítači, IndexedDB v prohlížeči)
+shared/sync.ts          synchronizace přes GitHub API (tříčestné porovnání, konflikty)
+shared/ai/              AI asistent, nástroje a smyčky pro poskytovatele (běží v Electronu i v prohlížeči)
 shared/                 parser Markdownu (odkazy, tagy, úkoly) a sdílené typy
+web/                    webová aplikace: backend v prohlížeči, IndexedDB, manifest a service worker
 src/                    rozhraní v Reactu (CodeMirror 6, markdown-it, d3-force)
 test/                   unit testy (Vitest) a smoke test (Playwright + Electron)
 ```

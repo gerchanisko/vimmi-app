@@ -12,7 +12,8 @@ const legacyKeyFile = () => path.join(app.getPath("userData"), "api-key.bin");
 
 let cache: Settings | undefined;
 
-type StoredKeys = Partial<Record<ProviderId, string>>;
+/** Encrypted secrets: one per AI provider, plus "github" for sync. */
+type StoredKeys = Partial<Record<ProviderId | "github", string>>;
 
 function readKeys(): StoredKeys {
   let keys: StoredKeys = {};
@@ -45,11 +46,18 @@ export function getApiKey(provider: ProviderId): string | undefined {
   return stored ? decode(stored) : undefined;
 }
 
-function derived(s: Omit<Settings, "hasApiKey" | "keys">): Pick<Settings, "hasApiKey" | "keys"> {
+/** GitHub token for sync. VIMMI_GITHUB_TOKEN overrides it (tests, development). */
+export function getSyncToken(): string | undefined {
+  if (process.env.VIMMI_GITHUB_TOKEN) return process.env.VIMMI_GITHUB_TOKEN;
+  const stored = readKeys().github;
+  return stored ? decode(stored) : undefined;
+}
+
+function derived(s: Omit<Settings, "hasApiKey" | "keys" | "hasSyncToken">): Pick<Settings, "hasApiKey" | "keys" | "hasSyncToken"> {
   const keys: Partial<Record<ProviderId, boolean>> = {};
   for (const p of PROVIDERS) keys[p.id] = Boolean(getApiKey(p.id));
   const info = PROVIDER_MAP[s.provider] ?? PROVIDER_MAP.anthropic;
-  return { keys, hasApiKey: Boolean(keys[info.id]) || !info.needsKey };
+  return { keys, hasApiKey: Boolean(keys[info.id]) || !info.needsKey, hasSyncToken: Boolean(getSyncToken()) };
 }
 
 export function loadSettings(): Settings {
@@ -62,7 +70,7 @@ export function loadSettings(): Settings {
   }
   // Migrate the single Claude model setting from 0.1.
   const { model: legacyModel, ...rest } = stored;
-  const merged = { ...DEFAULT_SETTINGS, ...rest };
+  const merged = { ...DEFAULT_SETTINGS, ...rest, sync: { ...DEFAULT_SETTINGS.sync, ...(rest.sync ?? {}) } };
   if (legacyModel && !merged.models.anthropic) merged.models = { ...merged.models, anthropic: legacyModel };
   if (!PROVIDER_MAP[merged.provider]) merged.provider = "anthropic";
   cache = { ...merged, ...derived(merged) };
@@ -74,7 +82,7 @@ export function saveSettings(patch: Partial<Settings>): Settings {
   const next = { ...base, ...derived(base) };
   cache = next;
   fs.mkdirSync(path.dirname(settingsFile()), { recursive: true });
-  const { hasApiKey: _h, keys: _k, ...persist } = next;
+  const { hasApiKey: _h, keys: _k, hasSyncToken: _t, ...persist } = next;
   fs.writeFileSync(settingsFile(), JSON.stringify(persist, null, 2));
   return next;
 }
@@ -83,7 +91,7 @@ export function keyStorageIsEncrypted(): boolean {
   return safeStorage.isEncryptionAvailable() && safeStorage.getSelectedStorageBackend?.() !== "basic_text";
 }
 
-export function setApiKey(provider: ProviderId, key: string | null): Settings {
+export function setApiKey(provider: ProviderId | "github", key: string | null): Settings {
   const keys = readKeys();
   if (!key) {
     delete keys[provider];

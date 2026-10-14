@@ -5,11 +5,13 @@ import { switchVault } from "../lib/actions";
 import { COMMANDS } from "../lib/commands";
 import { errorText, setState, toast, useApp } from "../lib/store";
 import { Icon, Logo } from "./Icon";
+import { SyncSettingsPanel } from "./Sync";
 
 const TABS = [
   { id: "general", label: "Obecné", icon: "settings" },
   { id: "editor", label: "Editor", icon: "pen" },
   { id: "ai", label: "AI", icon: "sparkle" },
+  { id: "sync", label: "Synchronizace", icon: "cloud" },
   { id: "keys", label: "Zkratky", icon: "command" },
   { id: "about", label: "O aplikaci", icon: "info" },
 ];
@@ -79,11 +81,11 @@ export default function Settings({ initialTab }: { initialTab?: string }) {
                   ))}
                 </div>
               </Row>
-              <Row label="Trezor" hint={snapshot?.root}>
+              {window.vimmi.app.kind === "desktop" && <Row label="Trezor" hint={snapshot?.root}>
                 <button className="btn" onClick={() => void switchVault().then(close)}>
                   <Icon name="folder-open" /> Otevřít jiný…
                 </button>
-              </Row>
+              </Row>}
               <Row label="Složka deníku" hint="Kam se ukládají denní poznámky (Ctrl+D).">
                 <TextSetting value={settings.dailyFolder} onSave={(v) => void update({ dailyFolder: v })} />
               </Row>
@@ -208,6 +210,8 @@ export default function Settings({ initialTab }: { initialTab?: string }) {
               </Row>
             </>
           )}
+
+          {tab === "sync" && <SyncSettingsPanel settings={settings} />}
 
           {tab === "keys" && (
             <>

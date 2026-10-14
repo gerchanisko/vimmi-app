@@ -3,11 +3,16 @@ import fs from "node:fs";
 import path from "node:path";
 import { app, BrowserWindow, dialog, ipcMain, nativeTheme, net, protocol, shell } from "electron";
 import { pathToFileURL } from "node:url";
-import { basename, isoDate, joinPath } from "../shared/markdown";
+import { basename, isoDate } from "../shared/markdown";
 import type { ProviderId } from "../shared/providers";
 import type { ChatContext, QuickRequest, Settings } from "../shared/types";
-import { Agent } from "./ai/agent";
-import { getApiKey, keyStorageIsEncrypted, loadSettings, saveSettings, setApiKey } from "./settings";
+import { Agent } from "../shared/ai/agent";
+import { dailyNote as dailyNoteFor, noteFromTemplate, templatePaths } from "../shared/vault-actions";
+import os from "node:os";
+import { createPrivateRepo, githubUser } from "../shared/sync";
+import { SyncManager } from "../shared/sync-manager";
+import type { SyncSettings } from "../shared/types";
+import { getApiKey, getSyncToken, keyStorageIsEncrypted, loadSettings, saveSettings, setApiKey } from "./settings";
 import { sampleNotes } from "./sample";
 import { Vault } from "./vault";
 
@@ -32,6 +37,19 @@ const agent = new Agent({
   openNote: (p) => send("vault:open-note", p),
 });
 
+const githubApi = () => process.env.VIMMI_GITHUB_API || undefined;
+
+const sync = new SyncManager(
+  () => vault,
+  () => {
+    const s = loadSettings().sync;
+    const token = getSyncToken();
+    if (!s.enabled || !token || !s.owner || !s.repo) return null;
+    return { owner: s.owner, repo: s.repo, branch: s.branch, token, device: os.hostname() || "počítač", apiBase: githubApi() };
+  },
+);
+sync.on("status", (st) => send("sync:status", st));
+
 async function openVault(dir: string): Promise<void> {
   vault?.close();
   agent.resetForVault();
@@ -44,6 +62,7 @@ async function openVault(dir: string): Promise<void> {
   const s = loadSettings();
   saveSettings({ vaultPath: v.root, recentVaults: [v.root, ...s.recentVaults.filter((r) => r !== v.root)].slice(0, 8) });
   win?.setTitle(`${path.basename(v.root)} – Vimmi`);
+  sync.restart();
 }
 
 function requireVault(): Vault {
@@ -61,26 +80,8 @@ async function createSampleVault(dir: string): Promise<void> {
   }
 }
 
-function fillTemplate(template: string, title: string, date = isoDate()): string {
-  const now = new Date();
-  return template
-    .replace(/\{\{\s*date\s*\}\}/g, date)
-    .replace(/\{\{\s*time\s*\}\}/g, now.toTimeString().slice(0, 5))
-    .replace(/\{\{\s*title\s*\}\}/g, title)
-    .replace(/\{\{\s*weekday\s*\}\}/g, new Date(`${date}T12:00:00`).toLocaleDateString("cs-CZ", { weekday: "long" }));
-}
-
-async function dailyNote(date: string): Promise<string> {
-  const v = requireVault();
-  const s = loadSettings();
-  const rel = joinPath(s.dailyFolder, `${date}.md`);
-  if (v.has(rel)) return rel;
-  const templatePath = v.find(joinPath(s.templatesFolder, "Denní poznámka"));
-  const template = templatePath
-    ? v.read(templatePath)
-    : "# {{weekday}} {{date}}\n\n## Dnes\n- [ ] \n\n## Poznámky\n\n";
-  await v.write(rel, fillTemplate(template, date, date));
-  return rel;
+function dailyNote(date: string): Promise<string> {
+  return dailyNoteFor(requireVault(), date, loadSettings());
 }
 
 function handle<A extends unknown[], R>(channel: string, fn: (...args: A) => R | Promise<R>): void {
@@ -128,6 +129,7 @@ function registerIpc(): void {
     return requireVault().snapshot();
   });
   handle("vault:close", () => {
+    sync.stop();
     vault?.close();
     vault = undefined;
     saveSettings({ vaultPath: undefined });
@@ -150,17 +152,31 @@ function registerIpc(): void {
   handle("vault:attachment", (name: string, data: Uint8Array) =>
     requireVault().saveAttachment(name, data, loadSettings().attachmentsFolder),
   );
-  handle("vault:templates", () => {
-    const v = requireVault();
-    const folder = loadSettings().templatesFolder;
-    return v.metas().filter((m) => m.folder === folder || m.folder.startsWith(folder + "/")).map((m) => m.path);
-  });
-  handle("vault:from-template", async (template: string, title: string, folder: string) => {
-    const v = requireVault();
-    const content = fillTemplate(v.read(template), title);
-    return v.create(joinPath(folder, title), content);
-  });
+  handle("vault:templates", () => templatePaths(requireVault(), loadSettings().templatesFolder));
+  handle("vault:from-template", (template: string, title: string, folder: string) =>
+    noteFromTemplate(requireVault(), template, title, folder),
+  );
   handle("vault:reveal", (rel: string) => shell.showItemInFolder(requireVault().abs(rel)));
+
+  // sync
+  handle("sync:status", () => sync.status);
+  handle("sync:now", () => sync.syncNow());
+  handle("sync:set-token", (token: string | null) => setApiKey("github", token));
+  handle("sync:user", async () => {
+    const token = getSyncToken();
+    if (!token) throw new Error("Nejdřív vlož GitHub token.");
+    return githubUser(token, githubApi());
+  });
+  handle("sync:create-repo", async (name: string) => {
+    const token = getSyncToken();
+    if (!token) throw new Error("Nejdřív vlož GitHub token.");
+    return createPrivateRepo(token, name, githubApi());
+  });
+  handle("sync:configure", (patch: Partial<SyncSettings>) => {
+    const next = saveSettings({ sync: { ...loadSettings().sync, ...patch } });
+    sync.restart();
+    return next;
+  });
 
   // app
   handle("app:open-external", (url: string) => {

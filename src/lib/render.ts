@@ -17,7 +17,7 @@ export interface RenderEnv {
 const IMAGE_EXT = /\.(png|jpe?g|gif|webp|svg|avif|bmp)$/i;
 
 export function fileUrl(rel: string): string {
-  return "vimmi-file://vault/" + rel.split("/").map(encodeURIComponent).join("/");
+  return window.vimmi.vault.fileUrl(rel);
 }
 
 function escapeHtml(s: string): string {

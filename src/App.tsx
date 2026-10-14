@@ -12,6 +12,8 @@ import Sidebar from "./components/Sidebar";
 import { ProjectsView, SearchView, TasksView, TodayView } from "./components/Views";
 import Welcome, { enterVault } from "./components/Welcome";
 import { newNote, toggleRight } from "./lib/actions";
+import { isMobile, useMobile } from "./lib/mobile";
+import { SyncIndicator } from "./components/Sync";
 import { handleShortcut } from "./lib/commands";
 import { flushAll, reloadDoc } from "./lib/docs";
 import { closeTab, getState, openNote, openView, refreshSnapshot, setState, useApp, type Tab } from "./lib/store";
@@ -58,6 +60,10 @@ export default function App() {
     const onKey = (e: KeyboardEvent) => {
       const s = getState();
       if (!s.snapshot || s.dialog) return;
+      if (e.key === "Escape" && !s.overlay && isMobile() && (s.leftOpen || s.right)) {
+        setState({ leftOpen: false, right: null });
+        return;
+      }
       if (s.overlay && s.overlay.type !== "settings") return;
       handleShortcut(e);
     };
@@ -97,6 +103,73 @@ function Workspace() {
   const active = useApp((s) => s.active);
   const leftOpen = useApp((s) => s.leftOpen);
   const right = useApp((s) => s.right);
+  const mobile = useMobile();
+
+  useEffect(() => {
+    if (mobile) setState({ leftOpen: false });
+  }, [mobile]);
+
+  const content = (
+    <div className="tab-content">
+      {tabs.length === 0 && <EmptyState />}
+      {tabs.map((t) => (
+        <div key={t.id} className="tab-pane" hidden={t.id !== active}>
+          <TabContent tab={t} active={t.id === active} />
+        </div>
+      ))}
+    </div>
+  );
+
+  if (mobile) {
+    const tab = tabs.find((t) => t.id === active);
+    const title = tab ? (tab.kind === "note" ? basename(tab.path) : VIEW_TITLES[tab.view][0]) : "Vimmi";
+    return (
+      <div className="workspace mobile">
+        <main className="main">
+          <div className="mobile-top">
+            <button className="icon-btn" onClick={() => setState({ leftOpen: true })} aria-label="Menu">
+              <Icon name="menu" size={20} />
+            </button>
+            <button className="mobile-title" onClick={() => setState({ overlay: { type: "spotlight" } })}>
+              {title}
+            </button>
+            <SyncIndicator compact />
+          </div>
+          {content}
+          <nav className="bottom-bar" aria-label="Hlavní navigace">
+            <button className={tab?.kind === "view" && tab.view === "today" ? "on" : ""} onClick={() => openView("today")}>
+              <Icon name="today" size={22} />
+              <span>Dnes</span>
+            </button>
+            <button className={tab?.kind === "view" && tab.view === "tasks" ? "on" : ""} onClick={() => openView("tasks")}>
+              <Icon name="task" size={22} />
+              <span>Úkoly</span>
+            </button>
+            <button className="bottom-new" onClick={() => void newNote()} aria-label="Nová poznámka">
+              <Icon name="plus" size={24} />
+            </button>
+            <button onClick={() => setState({ overlay: { type: "spotlight" } })}>
+              <Icon name="search" size={22} />
+              <span>Hledat</span>
+            </button>
+            <button className={right === "ai" ? "on" : ""} onClick={() => toggleRight("ai")}>
+              <Icon name="sparkle" size={22} />
+              <span>AI</span>
+            </button>
+          </nav>
+        </main>
+        {leftOpen && (
+          <>
+            <button className="drawer-backdrop" aria-label="Zavřít menu" onClick={() => setState({ leftOpen: false })} />
+            <div className="drawer">
+              <Sidebar />
+            </div>
+          </>
+        )}
+        <RightPanel />
+      </div>
+    );
+  }
 
   return (
     <div className={`workspace${leftOpen ? "" : " left-closed"}${right ? " right-open" : ""}`}>
@@ -114,6 +187,7 @@ function Workspace() {
               <Icon name="plus" size={14} />
             </button>
           </div>
+          <SyncIndicator compact />
           <button className={`btn ai-toggle${right === "ai" ? " on" : ""}`} onClick={() => toggleRight("ai")} title="AI asistent (Ctrl+J)">
             <Icon name="sparkle" /> AI
           </button>
@@ -121,14 +195,7 @@ function Workspace() {
             <Icon name="panel-right" />
           </button>
         </div>
-        <div className="tab-content">
-          {tabs.length === 0 && <EmptyState />}
-          {tabs.map((t) => (
-            <div key={t.id} className="tab-pane" hidden={t.id !== active}>
-              <TabContent tab={t} active={t.id === active} />
-            </div>
-          ))}
-        </div>
+        {content}
       </main>
       <RightPanel />
     </div>
