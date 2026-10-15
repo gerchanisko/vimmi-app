@@ -157,6 +157,7 @@ export default function Settings({ initialTab }: { initialTab?: string }) {
                         {p.recommended && <span className="pill accent">doporučeno</span>}
                         {p.free && <span className="pill">zdarma</span>}
                         {p.id === "ollama" && <span className="pill">lokálně</span>}
+                        {p.desktopOnly && window.vimmi.app.kind === "web" && <span className="pill">jen počítač</span>}
                         {settings.keys[p.id] && (
                           <span className="pill ok">
                             <Icon name="ok" size={12} /> klíč
@@ -342,6 +343,11 @@ function ProviderSettings({
   return (
     <div className="provider-settings">
       <p className="muted">{info.note}</p>
+      {info.desktopOnly && window.vimmi.app.kind === "web" && (
+        <p className="notice">
+          <Icon name="alert" size={14} /> {info.desktopOnly}
+        </p>
+      )}
       {(info.needsKey || provider === "custom") && (
         <Row
           label="API klíč"

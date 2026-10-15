@@ -589,7 +589,8 @@ export class Agent {
     } else {
       for await (const m of this.openaiClient(provider).models.list()) ids.push(m.id.replace(/^models\//, ""));
     }
-    return [...new Set(ids)].sort((a, b) => a.localeCompare(b));
+    const hide = PROVIDER_MAP[provider].hideModels;
+    return [...new Set(ids)].filter((id) => !hide?.test(id)).sort((a, b) => a.localeCompare(b));
   }
 }
 
