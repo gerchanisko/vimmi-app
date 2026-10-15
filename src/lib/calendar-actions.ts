@@ -1,6 +1,16 @@
 // Saving calendar events from the UI (events are notes in the calendar folder).
-import { eventBody, eventFilePath, eventMarkdown, type CalendarEvent, type EventInput } from "../../shared/calendar";
-import { errorText, getState, refreshSnapshot, toast } from "./store";
+import { useEffect, useMemo, useState } from "react";
+import {
+  eventBody,
+  eventFilePath,
+  eventMarkdown,
+  isCalendarFile,
+  readExternalCalendar,
+  type CalendarEvent,
+  type EventInput,
+  type ExternalCalendar,
+} from "../../shared/calendar";
+import { errorText, getState, refreshSnapshot, toast, useApp } from "./store";
 
 export function calendarFolder(): string {
   return getState().settings?.calendarFolder || "Kalendář";
@@ -60,3 +70,54 @@ export async function askNotificationPermission(): Promise<void> {
     /* not supported (e.g. some mobile browsers) */
   }
 }
+
+// ---------- read-only calendars (.ics files in the vault) ----------
+
+const icsCache = new Map<string, ExternalCalendar>();
+const icsLoading = new Set<string>();
+const icsListeners = new Set<() => void>();
+let icsWatching = false;
+
+function notifyIcs(): void {
+  for (const l of icsListeners) l();
+}
+
+async function loadIcs(file: string): Promise<void> {
+  if (icsLoading.has(file)) return;
+  icsLoading.add(file);
+  try {
+    icsCache.set(file, readExternalCalendar(file, await window.vimmi.calendar.read(file)));
+  } catch {
+    icsCache.delete(file);
+  } finally {
+    icsLoading.delete(file);
+    notifyIcs();
+  }
+}
+
+/** Calendars from .ics files in the vault (subscriptions downloaded on the desktop, imported files). */
+export function useExternalCalendars(): ExternalCalendar[] {
+  const files = useApp((s) => s.snapshot?.files ?? EMPTY).filter(isCalendarFile);
+  const key = files.join("\n");
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    const l = () => setTick((t) => t + 1);
+    icsListeners.add(l);
+    if (!icsWatching) {
+      icsWatching = true;
+      window.vimmi.vault.onNoteChanged(({ path }) => {
+        if (isCalendarFile(path)) void loadIcs(path);
+      });
+    }
+    return () => void icsListeners.delete(l);
+  }, []);
+  useEffect(() => {
+    for (const f of files) if (!icsCache.has(f)) void loadIcs(f);
+    for (const f of [...icsCache.keys()]) if (!files.includes(f)) icsCache.delete(f);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  return useMemo(() => files.map((f) => icsCache.get(f)).filter((c): c is ExternalCalendar => Boolean(c)), [key, tick]);
+}
+
+const EMPTY: string[] = [];

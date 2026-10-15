@@ -4,6 +4,8 @@ import type { ProviderId } from "../shared/providers";
 import type { NoteVersion } from "../shared/history";
 import type {
   AiEvent,
+  CalendarSubscription,
+  CalendarSubscriptionStatus,
   Chat,
   ChatContext,
   ChatSummary,
@@ -81,6 +83,15 @@ const api = {
     createRepo: (name: string) => invoke<{ owner: string; repo: string }>("sync:create-repo", name),
     configure: (patch: Partial<SyncSettings>) => invoke<Settings>("sync:configure", patch),
     onStatus: (cb: (s: SyncStatus) => void) => on("sync:status", cb),
+  },
+  calendar: {
+    /** Download state of subscribed calendars, by subscription id. */
+    status: () => invoke<Record<string, CalendarSubscriptionStatus>>("calendar:status"),
+    refresh: (id?: string) => invoke<Record<string, CalendarSubscriptionStatus>>("calendar:refresh", id),
+    save: (subs: CalendarSubscription[]) => invoke<Settings>("calendar:save", subs),
+    /** Text of a .ics file in the vault. */
+    read: (p: string) => invoke<string>("calendar:read", p),
+    onStatus: (cb: (s: Record<string, CalendarSubscriptionStatus>) => void) => on("calendar:status", cb),
   },
   update: {
     status: () => invoke<UpdateStatus>("update:status"),

@@ -1,9 +1,9 @@
 // Calendar view (month / week / day / list), like Google Calendar, on top of event notes.
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
+  allOccurrences,
   eventsFromNotes,
   fromMinutes,
-  occurrences,
   REPEAT_LABELS,
   type CalendarEvent,
   type EventColor,
@@ -15,7 +15,7 @@ import {
 import { addDays, isoDate, taskDisplayText } from "../../shared/markdown";
 import type { Task } from "../../shared/types";
 import { openDaily, toggleTask } from "../lib/actions";
-import { deleteEvent, eventToInput, saveEvent } from "../lib/calendar-actions";
+import { deleteEvent, eventToInput, saveEvent, useExternalCalendars } from "../lib/calendar-actions";
 import { useMobile } from "../lib/mobile";
 import { confirm, openNote, useApp } from "../lib/store";
 import { Icon } from "./Icon";
@@ -98,6 +98,9 @@ export default function CalendarView() {
   };
 
   const events = useMemo(() => eventsFromNotes(notes), [notes]);
+  const external = useExternalCalendars();
+  const getOcc = useCallback((from: string, to: string) => allOccurrences(events, external, from, to), [events, external]);
+  const [info, setInfo] = useState<CalendarEvent | null>(null);
   const tasks = useMemo(() => notes.flatMap((n) => n.tasks).filter((t) => t.due), [notes]);
   const dailyDays = useMemo(() => new Set(notes.filter((n) => /^\d{4}-\d{2}-\d{2}$/.test(n.title)).map((n) => n.title)), [notes]);
 
@@ -119,7 +122,7 @@ export default function CalendarView() {
           ? { title: "", date, allDay: true }
           : { title: "", date, allDay: false, start: fromMinutes(start), end: fromMinutes(Math.min(start + 60, 24 * 60 - 1)), remind: 15 },
     });
-  const openEvent = (e: CalendarEvent) => setDraft({ event: e, input: { ...eventToInput(e), description: e.description } });
+  const openEvent = (e: CalendarEvent) => (e.external ? setInfo(e) : setDraft({ event: e, input: { ...eventToInput(e), description: e.description } }));
   const openDay = (date: string) => {
     setCursor(date);
     setView("day");
@@ -174,13 +177,13 @@ export default function CalendarView() {
       </div>
 
       {view === "month" && (
-        <MonthGrid cursor={cursor} today={today} events={events} tasks={tasks} dailyDays={dailyDays} onDay={openDay} onNew={(date) => newEvent(date)} onEvent={openEvent} />
+        <MonthGrid cursor={cursor} today={today} getOcc={getOcc} tasks={tasks} dailyDays={dailyDays} onDay={openDay} onNew={(date) => newEvent(date)} onEvent={openEvent} />
       )}
       {(view === "week" || view === "day") && (
         <TimeGrid
           days={view === "day" ? [cursor] : Array.from({ length: 7 }, (_, i) => addDays(mondayOf(cursor), i))}
           today={today}
-          events={events}
+          getOcc={getOcc}
           tasks={tasks}
           dailyDays={dailyDays}
           onDay={openDay}
@@ -188,9 +191,10 @@ export default function CalendarView() {
           onEvent={openEvent}
         />
       )}
-      {view === "list" && <AgendaList from={cursor < today && cursor.slice(0, 7) === today.slice(0, 7) ? today : cursor} events={events} tasks={tasks} onEvent={openEvent} onNew={(date) => newEvent(date, 9 * 60)} />}
+      {view === "list" && <AgendaList from={cursor < today && cursor.slice(0, 7) === today.slice(0, 7) ? today : cursor} getOcc={getOcc} tasks={tasks} onEvent={openEvent} onNew={(date) => newEvent(date, 9 * 60)} />}
 
       {draft && <EventDialog draft={draft} onClose={() => setDraft(null)} />}
+      {info && <ExternalEventDialog event={info} onClose={() => setInfo(null)} />}
     </div>
   );
 }
@@ -202,7 +206,7 @@ function EventChip({ o, onClick, compact }: { o: Occurrence; onClick: (e: Calend
   const allDay = o.startMin === undefined;
   return (
     <button
-      className={`cal-chip${allDay ? " all-day" : ""}${compact ? " compact" : ""}`}
+      className={`cal-chip${allDay ? " all-day" : ""}${compact ? " compact" : ""}${o.event.external ? " external" : ""}`}
       style={{ "--ev": color } as React.CSSProperties}
       onClick={(e) => {
         e.stopPropagation();
@@ -232,7 +236,7 @@ function TaskChip({ task }: { task: Task }) {
 function MonthGrid({
   cursor,
   today,
-  events,
+  getOcc,
   tasks,
   dailyDays,
   onDay,
@@ -241,7 +245,7 @@ function MonthGrid({
 }: {
   cursor: string;
   today: string;
-  events: CalendarEvent[];
+  getOcc: (from: string, to: string) => Occurrence[];
   tasks: Task[];
   dailyDays: Set<string>;
   onDay: (date: string) => void;
@@ -251,7 +255,7 @@ function MonthGrid({
   const first = cursor.slice(0, 8) + "01";
   const start = mondayOf(first);
   const days = Array.from({ length: 42 }, (_, i) => addDays(start, i));
-  const occ = useMemo(() => occurrences(events, days[0], days[41]), [events, days[0]]);
+  const occ = useMemo(() => getOcc(days[0], days[41]), [getOcc, days[0]]);
   const month = cursor.slice(0, 7);
   return (
     <div className="cal-month" role="grid" aria-label={monthTitle(cursor)}>
@@ -357,7 +361,7 @@ interface DragState {
 function TimeGrid({
   days,
   today,
-  events,
+  getOcc,
   tasks,
   dailyDays,
   onDay,
@@ -366,7 +370,7 @@ function TimeGrid({
 }: {
   days: string[];
   today: string;
-  events: CalendarEvent[];
+  getOcc: (from: string, to: string) => Occurrence[];
   tasks: Task[];
   dailyDays: Set<string>;
   onDay: (date: string) => void;
@@ -384,7 +388,7 @@ function TimeGrid({
     return () => clearInterval(t);
   }, []);
 
-  const occ = useMemo(() => occurrences(events, days[0], days[days.length - 1]), [events, days[0], days.length]);
+  const occ = useMemo(() => getOcc(days[0], days[days.length - 1]), [getOcc, days[0], days.length]);
 
   // Start the day around 7:00 (or just before now).
   useLayoutEffect(() => {
@@ -453,6 +457,10 @@ function TimeGrid({
     if (e.button !== 0) return;
     e.stopPropagation();
     e.preventDefault();
+    if (o.event.external) {
+      onEvent(o.event); // read-only calendar: just show the details
+      return;
+    }
     setDrag({
       event: o.event,
       mode,
@@ -538,7 +546,7 @@ function TimeGrid({
                     return (
                       <div
                         key={i}
-                        className={`cal-event${height < 36 ? " short" : ""}`}
+                        className={`cal-event${height < 36 ? " short" : ""}${o.event.external ? " external" : ""}`}
                         style={{ top, height, left: `calc(${(col / n) * 100}% + 2px)`, width: `calc(${100 / n}% - 4px)`, "--ev": COLOR_VAR[o.event.color] } as React.CSSProperties}
                         onPointerDown={(e) => startDrag(e, o, "move")}
                         onClick={(e) => e.stopPropagation()}
@@ -553,7 +561,7 @@ function TimeGrid({
                           {o.event.location ? ` · ${o.event.location}` : ""}
                         </span>
                         {o.event.repeat && <Icon name="sync" size={11} className="cal-repeat" />}
-                        <div className="cal-resize" onPointerDown={(e) => startDrag(e, o, "resize")} />
+                        {!o.event.external && <div className="cal-resize" onPointerDown={(e) => startDrag(e, o, "resize")} />}
                       </div>
                     );
                   })}
@@ -589,19 +597,19 @@ function TimeGrid({
 
 function AgendaList({
   from,
-  events,
+  getOcc,
   tasks,
   onEvent,
   onNew,
 }: {
   from: string;
-  events: CalendarEvent[];
+  getOcc: (from: string, to: string) => Occurrence[];
   tasks: Task[];
   onEvent: (e: CalendarEvent) => void;
   onNew: (date: string) => void;
 }) {
   const to = addDays(from, 60);
-  const occ = useMemo(() => occurrences(events, from, to), [events, from, to]);
+  const occ = useMemo(() => getOcc(from, to), [getOcc, from, to]);
   const dueTasks = tasks.filter((t) => !t.done && t.due! >= from && t.due! <= to);
   const days = [...new Set([...occ.map((o) => o.date), ...dueTasks.map((t) => t.due!)])].sort();
   const today = isoDate();
@@ -819,3 +827,50 @@ function toMin(t: string): number {
   const [h, m] = t.split(":").map(Number);
   return h * 60 + m;
 }
+
+/** Details of an event from a subscribed calendar (read-only). */
+function ExternalEventDialog({ event, onClose }: { event: CalendarEvent; onClose: () => void }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+  const day = capitalize(d(event.date).toLocaleDateString("cs-CZ", { weekday: "long", day: "numeric", month: "long" }));
+  return (
+    <div className="overlay center" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="dialog event-dialog" role="dialog" aria-label={event.title}>
+        <h3 className="event-info-title">
+          <span className="color-dot on-static" style={{ background: COLOR_VAR[event.color] }} /> {event.title}
+        </h3>
+        <div className="event-row">
+          <Icon name="clock" />
+          <span>
+            {day} · {event.allDay ? "celý den" : `${event.start}–${event.end}`}
+          </span>
+        </div>
+        {event.location && (
+          <div className="event-row">
+            <Icon name="map-pin" />
+            <span>{event.location}</span>
+          </div>
+        )}
+        {event.description && (
+          <div className="event-row">
+            <Icon name="note" />
+            <p className="event-info-desc">{event.description}</p>
+          </div>
+        )}
+        <div className="event-row">
+          <Icon name="calendar" />
+          <span className="muted">Kalendář „{event.external?.calendar}“ – jen pro čtení, měníš ho ve svém kalendáři (např. Google).</span>
+        </div>
+        <div className="dialog-actions">
+          <button className="btn primary" onClick={onClose}>
+            Zavřít
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+

@@ -2,7 +2,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { addDays, basename, isoDate, taskDisplayText } from "../../shared/markdown";
 import type { NoteMeta, Priority, SearchHit, Task } from "../../shared/types";
-import { eventsFromNotes, occurrences } from "../../shared/calendar";
+import { allOccurrences, eventsFromNotes } from "../../shared/calendar";
+import { useExternalCalendars } from "../lib/calendar-actions";
 import { COLOR_VAR } from "./Calendar";
 import { askAi, openDaily, toggleTask } from "../lib/actions";
 import { errorText, openNote, openView, prompt, refreshSnapshot, toast, useApp } from "../lib/store";
@@ -121,7 +122,8 @@ export function TodayView() {
   const greeting = hour < 10 ? "Dobré ráno" : hour < 18 ? "Dobrý den" : "Dobrý večer";
   const longDate = new Date().toLocaleDateString("cs-CZ", { weekday: "long", day: "numeric", month: "long" });
   const totalToday = overdue.length + dueToday.length;
-  const agenda = useMemo(() => occurrences(eventsFromNotes(notes), today, addDays(today, 1)), [notes, today]);
+  const external = useExternalCalendars();
+  const agenda = useMemo(() => allOccurrences(eventsFromNotes(notes), external, today, addDays(today, 1)), [notes, external, today]);
 
   return (
     <div className="view today-view">

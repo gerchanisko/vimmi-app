@@ -90,6 +90,8 @@ export interface Settings {
   showThinking: boolean;
   dailyFolder: string;
   calendarFolder: string;
+  /** Subscribed read-only calendars (e.g. Google Calendar's private iCal address). Never synced. */
+  calendars: CalendarSubscription[];
   attachmentsFolder: string;
   templatesFolder: string;
   fontSize: number;
@@ -149,6 +151,7 @@ export const DEFAULT_SETTINGS: Settings = {
   showThinking: true,
   dailyFolder: "Deník",
   calendarFolder: "Kalendář",
+  calendars: [],
   attachmentsFolder: "Přílohy",
   templatesFolder: "Šablony",
   fontSize: 16,
@@ -261,3 +264,22 @@ export type QuickEvent =
   | { type: "delta"; id: string; delta: string }
   | { type: "done"; id: string; text: string }
   | { type: "error"; id: string; message: string };
+
+export interface CalendarSubscription {
+  id: string;
+  name: string;
+  /** Secret address of the calendar (.ics / webcal). Stays on this device. */
+  url: string;
+  color: string;
+  /** Vault file the calendar is saved to (set after the first download). */
+  file?: string;
+}
+
+export interface CalendarSubscriptionStatus {
+  /** Last successful download. */
+  at?: number;
+  events?: number;
+  error?: string;
+  busy?: boolean;
+}
+

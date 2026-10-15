@@ -114,6 +114,29 @@ const server = http.createServer((req, res) => {
   let body = "";
   req.on("data", (c) => (body += c));
   req.on("end", () => {
+    if (req.url === "/private-secret/basic.ics") {
+      // A Google-style calendar: today's meeting and a weekly repeat.
+      const day = new Date();
+      const ymd = `${day.getFullYear()}${String(day.getMonth() + 1).padStart(2, "0")}${String(day.getDate()).padStart(2, "0")}`;
+      res.writeHead(200, { "content-type": "text/calendar" });
+      res.end(
+        [
+          "BEGIN:VCALENDAR",
+          "X-WR-CALNAME:Google",
+          "BEGIN:VEVENT",
+          "UID:g1",
+          "DTSTAMP:20261015T100000Z",
+          "SUMMARY:Porada z Googlu",
+          `DTSTART;TZID=Europe/Prague:${ymd}T130000`,
+          `DTEND;TZID=Europe/Prague:${ymd}T140000`,
+          "LOCATION:Zasedačka 2",
+          "END:VEVENT",
+          "END:VCALENDAR",
+          "",
+        ].join("\r\n"),
+      );
+      return;
+    }
     if (req.url === "/release/latest") {
       res.writeHead(200, { "content-type": "application/json" });
       res.end(JSON.stringify({ tag_name: "v9.9.9" }));
@@ -349,6 +372,30 @@ try {
     await shot("21-calendar-event");
     await page.keyboard.press("Escape");
     await cal.locator(".segmented >> text=Týden").click();
+  });
+
+  await step("Google Calendar subscription: download, show read-only, secret stays out of the vault", async () => {
+    await page.keyboard.press("Control+,");
+    await page.click(".settings-nav >> text=Kalendář");
+    await page.fill("input[aria-label='Název kalendáře']", "Google");
+    await page.fill("input[aria-label='Adresa kalendáře']", `${apiUrl}/private-secret/basic.ics`);
+    await page.click("text=Přidat kalendář");
+    await page.waitForSelector(".cal-sub >> text=1 událostí", { timeout: 10000 });
+    await shot("25-calendar-settings");
+    const file = path.join("Kalendář", "Odebírané", "Google.ics");
+    if (!read(file).includes("Porada z Googlu")) throw new Error("calendar not saved into the vault");
+    if (read(file).includes("private-secret")) throw new Error("secret address leaked into the vault");
+    await page.keyboard.press("Escape");
+    await page.click(".side-nav >> text=Kalendář");
+    const cal = page.locator(".tab-pane:not([hidden]) .calendar");
+    await cal.locator(".segmented >> text=Týden").click();
+    const ev = cal.locator(".cal-event.external", { hasText: "Porada z Googlu" });
+    await ev.waitFor({ timeout: 10000 });
+    await ev.scrollIntoViewIfNeeded();
+    await ev.click();
+    await page.waitForSelector(".dialog >> text=jen pro čtení");
+    await shot("26-calendar-google-event");
+    await page.keyboard.press("Escape");
   });
 
   await step("command palette (Ctrl+P)", async () => {

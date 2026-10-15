@@ -12,6 +12,7 @@ import { DEFAULT_SETTINGS, type Settings, type SyncSettings, type UpdateStatus }
 import { Vault } from "../shared/vault";
 import { dailyNote, noteFromTemplate, templatePaths } from "../shared/vault-actions";
 import { IdbStorage, kvDelete, kvGet, kvSet, openDb } from "./idb-storage";
+import { CalendarSubscriptions } from "../shared/calendar-subs";
 
 const SETTINGS_KEY = "vimmi:settings";
 const VAULT_FLAG = "vimmi:vault";
@@ -92,6 +93,7 @@ export async function installBackend(): Promise<void> {
     vault = v;
     localStorage.setItem(VAULT_FLAG, "1");
     sync.restart();
+    calendars.start();
   };
   const requireVault = () => {
     if (!vault) throw new Error("Trezor není otevřený.");
@@ -108,6 +110,14 @@ export async function installBackend(): Promise<void> {
     },
   );
   sync.on("status", (st) => bus.emit("sync:status", st));
+  // Browsers usually may not download calendars from other sites (Google sends no CORS headers);
+  // the desktop app downloads them into the vault and sync brings them here.
+  const calendars = new CalendarSubscriptions(
+    () => vault,
+    () => settings,
+    (subs) => saveSettings({ calendars: subs }),
+  );
+  calendars.on("status", (st) => bus.emit("calendar:status", st));
   // Sync when the app comes back to the foreground (switching apps on a phone).
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "visible" && vault) void sync.syncNow({ quick: true });
@@ -248,6 +258,17 @@ export async function installBackend(): Promise<void> {
           return next;
         }),
       onStatus: (cb) => on("sync:status", cb),
+    },
+    calendar: {
+      status: () => wrap(() => calendars.status),
+      refresh: (id) => calendars.refresh(id),
+      save: (subs) => calendars.save(subs).then(() => settings),
+      read: (p) =>
+        wrap(async () => {
+          if (!/\.ics$/i.test(p)) throw new Error("Jen soubory kalendáře (.ics).");
+          return new TextDecoder().decode(await requireVault().readBytes(p));
+        }),
+      onStatus: (cb) => on("calendar:status", cb),
     },
     update: {
       status: () => wrap(() => update),

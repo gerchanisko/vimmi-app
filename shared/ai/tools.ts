@@ -5,7 +5,19 @@ import type Anthropic from "@anthropic-ai/sdk";
 import { addDays, basename, isoDate, joinPath, taskDisplayText } from "../markdown";
 import type { Task } from "../types";
 import { insertUnderHeading, Vault, VaultError } from "../vault";
-import { eventBody, eventFilePath, eventFromMeta, eventMarkdown, eventsFromNotes, occurrences, REPEAT_LABELS, type CalendarEvent } from "../calendar";
+import {
+  allOccurrences,
+  eventBody,
+  eventFilePath,
+  eventFromMeta,
+  eventMarkdown,
+  eventsFromNotes,
+  isCalendarFile,
+  readExternalCalendar,
+  REPEAT_LABELS,
+  type CalendarEvent,
+  type ExternalCalendar,
+} from "../calendar";
 
 export interface ToolEnv {
   vault: Vault;
@@ -388,12 +400,26 @@ export const TOOLS = [
       to: dateField.optional().describe("YYYY-MM-DD, default from + 7 days."),
     }),
     write: false,
-    run: ({ from, to }, { vault }) => {
+    run: async ({ from, to }, { vault }) => {
       const start = from ?? isoDate();
       const end = to ?? addDays(start, 7);
-      const occ = occurrences(eventsFromNotes(vault.metas()), start, end);
+      const calendars: ExternalCalendar[] = [];
+      for (const file of vault.snapshot().files.filter(isCalendarFile)) {
+        try {
+          calendars.push(readExternalCalendar(file, new TextDecoder().decode(await vault.readBytes(file))));
+        } catch {
+          /* unreadable calendar file */
+        }
+      }
+      const occ = allOccurrences(eventsFromNotes(vault.metas()), calendars, start, end);
       if (!occ.length) return `V kalendáři mezi ${start} a ${end} nic není.`;
-      return occ.map((o) => `- ${describeOccurrence(o.date, o.event)} (${o.event.path})`).join("\n");
+      return occ
+        .map((o) =>
+          o.event.external
+            ? `- ${describeOccurrence(o.date, o.event)} (kalendář „${o.event.external.calendar}“, jen pro čtení)`
+            : `- ${describeOccurrence(o.date, o.event)} (${o.event.path})`,
+        )
+        .join("\n");
     },
   }),
   def({

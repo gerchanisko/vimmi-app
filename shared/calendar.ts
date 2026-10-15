@@ -12,7 +12,8 @@
 //   color: blue
 //   ---
 // Events sync and work in Obsidian like any other note.
-import { addDays, isoDate, joinPath, safeFileName } from "./markdown";
+import { icsOccurrences, parseIcs, type IcsCalendar } from "./ics";
+import { addDays, basename, isoDate, joinPath, safeFileName } from "./markdown";
 import type { NoteMeta } from "./types";
 
 export type Repeat = "daily" | "weekly" | "monthly" | "yearly";
@@ -36,6 +37,8 @@ export interface CalendarEvent {
   remind?: number;
   color: EventColor;
   description: string;
+  /** Read-only event from a subscribed or imported .ics calendar. */
+  external?: { calendar: string; file: string };
 }
 
 export interface EventInput {
@@ -233,3 +236,57 @@ export const REPEAT_LABELS: Record<Repeat, string> = {
   monthly: "Každý měsíc",
   yearly: "Každý rok",
 };
+
+// ---------- read-only calendars (.ics files in the vault) ----------
+
+export interface ExternalCalendar {
+  /** Vault path of the .ics file. */
+  file: string;
+  calendar: IcsCalendar;
+}
+
+export function isCalendarFile(path: string): boolean {
+  return /\.ics$/i.test(path);
+}
+
+export function readExternalCalendar(file: string, text: string): ExternalCalendar {
+  const calendar = parseIcs(text);
+  if (!calendar.name) calendar.name = basename(file).replace(/\.ics$/i, "");
+  return { file, calendar };
+}
+
+/** Occurrences of .ics events, shaped like Vimmi events (marked as external, read-only). */
+export function externalOccurrences(calendars: ExternalCalendar[], from: string, to: string): Occurrence[] {
+  const out: Occurrence[] = [];
+  for (const { file, calendar } of calendars) {
+    const color = (EVENT_COLORS as readonly string[]).includes(calendar.color ?? "") ? (calendar.color as EventColor) : "blue";
+    for (const o of icsOccurrences(calendar, from, to)) {
+      out.push({
+        date: o.date,
+        startMin: o.startMin,
+        endMin: o.endMin,
+        event: {
+          path: `${file}#${o.uid}`,
+          title: o.title,
+          date: o.date,
+          start: o.start,
+          end: o.end,
+          allDay: o.allDay,
+          location: o.location,
+          color,
+          description: o.description ?? "",
+          external: { calendar: calendar.name, file },
+        },
+      });
+    }
+  }
+  return out;
+}
+
+/** Vimmi's own events and the read-only calendars together, sorted. */
+export function allOccurrences(events: CalendarEvent[], calendars: ExternalCalendar[], from: string, to: string): Occurrence[] {
+  return [...occurrences(events, from, to), ...externalOccurrences(calendars, from, to)].sort(
+    (a, b) => a.date.localeCompare(b.date) || (a.startMin ?? -1) - (b.startMin ?? -1) || a.event.title.localeCompare(b.event.title, "cs"),
+  );
+}
+

@@ -5,11 +5,12 @@ import { app, BrowserWindow, dialog, ipcMain, nativeTheme, net, protocol, shell 
 import { pathToFileURL } from "node:url";
 import { basename, isoDate } from "../shared/markdown";
 import type { ProviderId } from "../shared/providers";
-import type { ChatContext, QuickRequest, Settings } from "../shared/types";
+import type { CalendarSubscription, ChatContext, QuickRequest, Settings } from "../shared/types";
 import { Agent } from "../shared/ai/agent";
 import { dailyNote as dailyNoteFor, noteFromTemplate, templatePaths } from "../shared/vault-actions";
 import os from "node:os";
 import { createPrivateRepo, githubUser } from "../shared/sync";
+import { CalendarSubscriptions } from "../shared/calendar-subs";
 import { SyncManager } from "../shared/sync-manager";
 import { Updater } from "./updater";
 import type { SyncSettings } from "../shared/types";
@@ -51,6 +52,13 @@ const sync = new SyncManager(
 );
 sync.on("status", (st) => send("sync:status", st));
 
+const calendars = new CalendarSubscriptions(
+  () => vault,
+  () => loadSettings(),
+  (subs) => saveSettings({ calendars: subs }),
+);
+calendars.on("status", (st) => send("calendar:status", st));
+
 const updater = new Updater(
   (st) => send("update:status", st),
   () => loadSettings().autoUpdate,
@@ -69,6 +77,7 @@ async function openVault(dir: string): Promise<void> {
   saveSettings({ vaultPath: v.root, recentVaults: [v.root, ...s.recentVaults.filter((r) => r !== v.root)].slice(0, 8) });
   win?.setTitle(`${path.basename(v.root)} – Vimmi`);
   sync.restart();
+  calendars.start();
 }
 
 function requireVault(): Vault {
@@ -179,6 +188,13 @@ function registerIpc(): void {
   // sync
   handle("sync:status", () => sync.status);
   handle("sync:now", () => sync.syncNow());
+  handle("calendar:status", () => calendars.status);
+  handle("calendar:refresh", (id?: string) => calendars.refresh(id));
+  handle("calendar:save", (subs: CalendarSubscription[]) => calendars.save(subs).then(() => loadSettings()));
+  handle("calendar:read", async (rel: string) => {
+    if (!/\.ics$/i.test(rel)) throw new Error("Jen soubory kalendáře (.ics).");
+    return new TextDecoder().decode(await requireVault().readBytes(rel));
+  });
   handle("sync:history", (rel: string) => sync.history(rel));
   handle("sync:version", (rel: string, sha: string) => sync.version(rel, sha));
   handle("sync:set-token", (token: string | null) => setApiKey("github", token));

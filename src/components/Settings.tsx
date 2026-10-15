@@ -5,6 +5,7 @@ import { switchVault } from "../lib/actions";
 import { COMMANDS } from "../lib/commands";
 import { errorText, setState, toast, useApp } from "../lib/store";
 import { Icon, Logo } from "./Icon";
+import { CalendarSettingsPanel } from "./CalendarSettings";
 import { SyncSettingsPanel } from "./Sync";
 import { UpdateSettings } from "./Update";
 
@@ -12,6 +13,7 @@ const TABS = [
   { id: "general", label: "Obecné", icon: "settings" },
   { id: "editor", label: "Editor", icon: "pen" },
   { id: "ai", label: "AI", icon: "sparkle" },
+  { id: "calendar", label: "Kalendář", icon: "calendar" },
   { id: "sync", label: "Synchronizace", icon: "cloud" },
   { id: "keys", label: "Zkratky", icon: "command" },
   { id: "about", label: "O aplikaci", icon: "info" },
@@ -212,6 +214,7 @@ export default function Settings({ initialTab }: { initialTab?: string }) {
             </>
           )}
 
+          {tab === "calendar" && <CalendarSettingsPanel settings={settings} />}
           {tab === "sync" && <SyncSettingsPanel settings={settings} />}
 
           {tab === "keys" && (
