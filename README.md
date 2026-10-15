@@ -9,7 +9,7 @@ Poznámky, úkoly a projekty v jednom klidném prostoru – s AI asistentem.</p>
 
 <p align="center"><a href="https://vimmi.space/">Web</a> · <a href="https://app.vimmi.space/">Otevřít v prohlížeči</a> · <a href="#instalace">Instalace</a> · <a href="#synchronizace">Synchronizace</a> · <a href="#funkce">Funkce</a> · <a href="#ai-poskytovatelé">AI</a></p>
 
-Poznámky jsou obyčejné soubory Markdown ve složce (trezoru), takže jsou vždycky tvoje a funguje to i s trezorem z Obsidianu. AI asistent (Claude, OpenRouter, OpenAI, Gemini nebo lokální Ollama) umí v poznámkách hledat, shrnovat, plánovat a rovnou je upravovat.
+Poznámky jsou obyčejné soubory Markdown ve složce (trezoru), takže jsou vždycky tvoje a funguje to i s trezorem z Obsidianu. AI asistent (Claude, Gemini, OpenRouter, OpenAI nebo lokální Ollama) umí v poznámkách hledat, shrnovat, plánovat a rovnou je upravovat.
 
 ![Vimmi – AI asistent](docs/screenshots/editor-ai.png)
 
@@ -115,9 +115,9 @@ Synchronizuje se automaticky při spuštění, každých 15 sekund a při návra
 | Poskytovatel | API | Poznámka |
 | --- | --- | --- |
 | **Claude (Anthropic)** – doporučeno | Anthropic SDK, Messages API | Výchozí, Claude Sonnet 5.5. Přemýšlení, hledání na webu, prompt caching, záložní model při odmítnutí (`fallbacks: "default"`). |
+| **Google Gemini** – doporučeno zdarma | OpenAI-kompatibilní endpoint | Flash modely mají bezplatnou úroveň, dobře zvládají češtinu i nástroje a fungují i v telefonu. Klíč z Google AI Studia. |
 | **OpenAI** | OpenAI SDK, Responses API | GPT-6.x. Nástroje, přemýšlení, hledání na webu; bezstavově (`store: false`). |
-| **Google Gemini** | OpenAI-kompatibilní endpoint | Flash modely mají bezplatnou úroveň. Klíč z Google AI Studia. |
-| **OpenRouter** – doporučeno | OpenAI-kompatibilní | Stovky modelů jedním klíčem, modely `:free` zdarma (s limity). |
+| **OpenRouter** | OpenAI-kompatibilní | Stovky modelů jedním klíčem, modely `:free` zdarma (s limity). |
 | **Ollama** | OpenAI-kompatibilní, lokálně | Zdarma, poznámky neopustí počítač. Model musí podporovat nástroje (tools). |
 | **Vlastní** | OpenAI Chat Completions | LM Studio, vLLM, Groq, Mistral, DeepSeek… s vlastní adresou serveru. |
 

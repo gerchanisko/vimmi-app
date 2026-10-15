@@ -243,7 +243,7 @@ export default function AiChat() {
           Asistent umí číst tvoje poznámky, hledat souvislosti, shrnovat, plánovat a s tvým svolením i upravovat a vytvářet poznámky a úkoly.
         </p>
         <p className="muted">
-          Vyber si poskytovatele: doporučený Claude nebo OpenRouter (i s bezplatnými modely), dále OpenAI, Gemini, nebo model běžící lokálně v Ollamě.
+          Vyber si poskytovatele: doporučený Claude, nebo Google Gemini, který má bezplatnou úroveň. Dále OpenRouter, OpenAI, nebo model běžící lokálně v Ollamě.
           Teď je vybraný <strong>{info.name}</strong> a chybí mu API klíč.
         </p>
         <button className="btn primary" onClick={() => setState({ overlay: { type: "settings", tab: "ai" } })}>
