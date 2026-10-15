@@ -562,7 +562,7 @@ export class Agent {
     }
   }
 
-  /** Checks the key, server and model without spending tokens. */
+  /** Checks the key, server and model (OpenAI-compatible servers: with a tiny request of a few tokens). */
   async testKey(provider: ProviderId): Promise<{ ok: boolean; message: string }> {
     const info = PROVIDER_MAP[provider];
     try {
@@ -574,6 +574,11 @@ export class Agent {
       const ids = await this.listModels(provider);
       if (model && !ids.includes(model)) {
         return { ok: true, message: `Spojení funguje (${ids.length} modelů), ale model „${model}“ v seznamu není. Vyber jiný.` };
+      }
+      if (model && info.kind === "chat") {
+        // Being in the list does not mean the account may use it (NVIDIA, OpenRouter): try a tiny request.
+        await this.openaiClient(provider).chat.completions.create({ model, messages: [{ role: "user", content: "Ahoj" }], max_tokens: 8 });
+        return { ok: true, message: `Spojení funguje a model „${model}“ odpovídá.` };
       }
       return { ok: true, message: `Spojení funguje. ${ids.length} dostupných modelů${model ? `, „${model}“ mezi nimi` : ""}.` };
     } catch (err) {

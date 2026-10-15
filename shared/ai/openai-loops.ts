@@ -305,7 +305,10 @@ export async function streamText(
 export function friendlyOpenAIError(err: unknown, providerName: string): string | null {
   if (err instanceof OpenAI.AuthenticationError) return `${providerName}: API klíč je neplatný. Zkontroluj ho v Nastavení → AI.`;
   if (err instanceof OpenAI.PermissionDeniedError) return `${providerName}: klíč nemá přístup k tomuto modelu.`;
-  if (err instanceof OpenAI.NotFoundError) return `${providerName}: model nebo adresa serveru nebyla nalezena. Vyber jiný model v Nastavení → AI.`;
+  if (err instanceof OpenAI.NotFoundError) {
+    const detail = serverDetail(err);
+    return `${providerName}: model nebo adresa serveru nebyla nalezena${detail ? ` (${detail})` : ""}. Vyber jiný model v Nastavení → AI.`;
+  }
   if (err instanceof OpenAI.RateLimitError) return `${providerName}: limit požadavků nebo kreditu je vyčerpaný. Zkus to za chvíli (bezplatné modely mají denní limity).`;
   if (err instanceof OpenAI.BadRequestError) {
     if (/tool|function/i.test(err.message)) return `${providerName}: tento model asi nepodporuje nástroje. Vyber jiný model. (${err.message})`;
@@ -315,4 +318,11 @@ export function friendlyOpenAIError(err: unknown, providerName: string): string 
   if (err instanceof OpenAI.APIConnectionError) return `Nepodařilo se spojit s ${providerName}. Běží server a jsi připojený k internetu?`;
   if (err instanceof OpenAI.APIError) return `${providerName}: chyba API (${err.status}): ${err.message}`;
   return null;
+}
+
+/** The server's own explanation (OpenAI, NVIDIA and others put it in different fields). */
+function serverDetail(err: InstanceType<typeof OpenAI.APIError>): string {
+  const body = err.error as { message?: string; detail?: string; title?: string } | undefined;
+  const text = body?.detail || body?.message || (typeof err.error === "string" ? err.error : "") || "";
+  return String(text).replace(/\s+/g, " ").slice(0, 200);
 }
