@@ -378,9 +378,29 @@ function Message({
         <Part key={i} part={p} showThinking={showThinking} />
       ))}
       {working && (!lastPart || lastPart.kind !== "text" || lastPart.closed) && (
-        <p className="muted thinking-dots">{lastPart?.kind === "tool" && lastPart.status === "waiting" ? "Čeká na tvoje schválení" : "AI pracuje"}</p>
+        lastPart?.kind === "tool" && lastPart.status === "waiting" ? (
+          <p className="muted thinking-dots">Čeká na tvoje schválení</p>
+        ) : (
+          <Working key={message.parts.length} />
+        )
       )}
     </div>
+  );
+}
+
+/** "AI pracuje" with the time spent waiting, so a slow (free, busy) server does not look frozen. */
+function Working() {
+  const [seconds, setSeconds] = useState(0);
+  useEffect(() => {
+    const started = Date.now();
+    const t = setInterval(() => setSeconds(Math.floor((Date.now() - started) / 1000)), 1000);
+    return () => clearInterval(t);
+  }, []);
+  return (
+    <p className="muted thinking-dots">
+      AI pracuje{seconds >= 5 ? ` · ${seconds} s` : ""}
+      {seconds >= 20 && <span className="small"> – model ještě nezačal odpovídat, bezplatné servery bývají vytížené</span>}
+    </p>
   );
 }
 

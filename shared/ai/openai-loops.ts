@@ -25,6 +25,42 @@ export interface LoopContext {
 }
 
 const MAX_STEPS = 40;
+/** Free servers can sit in a queue; give up when the model has not started answering by then. */
+export const FIRST_TOKEN_MS = 90_000;
+
+export class SlowModelError extends Error {
+  constructor(readonly seconds: number) {
+    super(`Model neodpověděl do ${seconds} s.`);
+  }
+}
+
+/**
+ * An abort signal for one model request: it follows the user's Stop button and also fires when
+ * the first streamed chunk does not arrive in time. Call `started()` when the first chunk arrives.
+ */
+function firstTokenGuard(user: AbortSignal) {
+  const ctrl = new AbortController();
+  let timedOut = false;
+  const onAbort = () => ctrl.abort();
+  user.addEventListener("abort", onAbort);
+  const timer = setTimeout(() => {
+    timedOut = true;
+    ctrl.abort();
+  }, FIRST_TOKEN_MS);
+  return {
+    signal: ctrl.signal,
+    started: () => clearTimeout(timer),
+    done: () => {
+      clearTimeout(timer);
+      user.removeEventListener("abort", onAbort);
+    },
+    /** Turns an abort caused by the timeout into a clear error. */
+    check: (err: unknown): never => {
+      if (timedOut && !user.aborted) throw new SlowModelError(FIRST_TOKEN_MS / 1000);
+      throw err;
+    },
+  };
+}
 
 function cost(prices: [number, number, number] | undefined, input: number, output: number, cached: number): number | null {
   if (!prices) return null;
@@ -172,21 +208,26 @@ export async function runChatLoop(ctx: LoopContext): Promise<void> {
   }));
 
   for (let step = 0; step < MAX_STEPS; step++) {
-    const stream = await client.chat.completions.create(
-      {
-        model: ctx.model,
-        messages: [{ role: "system", content: ctx.system }, ...(history as OpenAI.Chat.ChatCompletionMessageParam[])],
-        tools,
-        stream: true,
-        stream_options: { include_usage: true },
-      },
-      { signal: ctx.signal },
-    );
-
+    const guard = firstTokenGuard(ctx.signal);
     let text = "";
     let finish: string | null = null;
     const calls: PendingCall[] = [];
+    try {
+    const stream = await client.chat.completions
+      .create(
+        {
+          model: ctx.model,
+          messages: [{ role: "system", content: ctx.system }, ...(history as OpenAI.Chat.ChatCompletionMessageParam[])],
+          tools,
+          stream: true,
+          stream_options: { include_usage: true },
+        },
+        { signal: guard.signal },
+      )
+      .catch(guard.check);
+
     for await (const chunk of stream) {
+      guard.started();
       if (chunk.usage) {
         const cached = (chunk.usage as { prompt_tokens_details?: { cached_tokens?: number } }).prompt_tokens_details?.cached_tokens ?? 0;
         send({
@@ -223,6 +264,11 @@ export async function runChatLoop(ctx: LoopContext): Promise<void> {
         if (tc.function?.arguments) calls[i].args += tc.function.arguments;
       }
       if (choice.finish_reason) finish = choice.finish_reason;
+    }
+    } catch (err) {
+      guard.check(err);
+    } finally {
+      guard.done();
     }
     finishText(assistant, send);
     assistant.parts = assistant.parts.filter((p) => !(p.kind === "thinking" && !p.text.trim()));
@@ -303,6 +349,9 @@ export async function streamText(
 
 /** Turns SDK errors from OpenAI-compatible servers into short Czech messages. */
 export function friendlyOpenAIError(err: unknown, providerName: string): string | null {
+  if (err instanceof SlowModelError) {
+    return `${providerName}: model nezačal odpovídat do ${err.seconds} s – server je nejspíš přetížený (u bezplatných modelů se to stává). Zkus to znovu, nebo v Nastavení → AI klikni na „Otestovat spojení“ a Vimmi vybere nejrychlejší model.`;
+  }
   if (err instanceof OpenAI.AuthenticationError) return `${providerName}: API klíč je neplatný. Zkontroluj ho v Nastavení → AI.`;
   if (err instanceof OpenAI.PermissionDeniedError) return `${providerName}: klíč nemá přístup k tomuto modelu.`;
   if (err instanceof OpenAI.NotFoundError) {

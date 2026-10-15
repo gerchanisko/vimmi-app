@@ -16,6 +16,11 @@ beforeAll(async () => {
         return;
       }
       const model = JSON.parse(body).model as string;
+      const ok = () => res.end(JSON.stringify({ id: "1", object: "chat.completion", choices: [{ index: 0, message: { role: "assistant", content: "Ahoj" }, finish_reason: "stop" }] }));
+      if (model === "z-ai/glm-5.3") {
+        setTimeout(ok, 3500); // works, but slowly (busy free server)
+        return;
+      }
       if (model !== "deepseek-ai/deepseek-v4.1-flash") {
         res.statusCode = 404;
         res.end(JSON.stringify({ status: 404, title: "Not Found", detail: "Function 'abc': Not found for account 'xyz'" }));
@@ -47,6 +52,13 @@ describe("NVIDIA", () => {
     expect(await agent("").listModels("nvidia")).not.toContain("nvidia/nv-embedqa-e5-v5");
     const r = await agent("moonshotai/kimi-k2.6").testKey("nvidia");
     expect(r).toMatchObject({ ok: true, model: "deepseek-ai/deepseek-v4.1-flash" });
+  });
+
+  it("switches from a working but much slower model to the fastest one", async () => {
+    const r = await agent("z-ai/glm-5.3").testKey("nvidia");
+    expect(r.model).toBe("deepseek-ai/deepseek-v4.1-flash");
+    expect(r.message).toContain("výrazně pomalejší");
+    expect(r.message).toMatch(/glm-5\.3 3\.\d s/);
   });
 
   it("explains the account error in the chat", async () => {
