@@ -8,8 +8,9 @@ on:
   workflow_dispatch:
   pull_request:
 
+# Least privilege: jobs get only read access unless they need more (see the release job).
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   test:
@@ -53,6 +54,8 @@ jobs:
     name: Release (${{ matrix.os }})
     if: github.event_name != 'pull_request'
     needs: test
+    permissions:
+      contents: write
     strategy:
       matrix:
         include:
@@ -81,3 +84,14 @@ jobs:
           tag="v$(node -p "require('./package.json').version")"
           gh release view "$tag" >/dev/null 2>&1 || gh release create "$tag" --title "Vimmi $tag" --notes-file .github/release-notes.md || true
           gh release upload "$tag" ${{ matrix.files }} --clobber
+
+  # The web app (phones) is deployed together with the desktop release, from the same commit.
+  web:
+    name: Web app
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    needs: release
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    uses: ./.github/workflows/pages.yml

@@ -13,7 +13,8 @@
 set -euo pipefail
 
 REPO_URL="${VIMMI_REPO:-https://github.com/gerchanisko/vimmi-app.git}"
-BRANCH="${VIMMI_BRANCH:-main}"
+# Which version to install: the newest release (tested on CI) unless VIMMI_BRANCH says otherwise.
+BRANCH="${VIMMI_BRANCH:-}"
 DATA_DIR="${VIMMI_DATA_DIR:-$HOME/.local/share/vimmi}"
 SRC_DIR="$DATA_DIR/source"
 NODE_DIR="$DATA_DIR/node"
@@ -150,16 +151,22 @@ fi
 if [ -n "$script_dir" ] && [ -f "$script_dir/package.json" ] && grep -q '"name": "vimmi"' "$script_dir/package.json"; then
   BUILD_DIR="$script_dir"
   info "Používám zdrojáky ze složky $BUILD_DIR"
-elif [ -d "$SRC_DIR/.git" ]; then
-  BUILD_DIR="$SRC_DIR"
-  git -C "$SRC_DIR" fetch --quiet origin "$BRANCH"
-  git -C "$SRC_DIR" reset --quiet --hard "origin/$BRANCH"
-  info "Aktualizováno na $(git -C "$SRC_DIR" log -1 --format='%h %s')"
 else
+  if [ -z "$BRANCH" ]; then
+    # Newest release tag (vX.Y.Z); main only if there is no release yet.
+    BRANCH="$( { git ls-remote --tags --refs --sort=-v:refname "$REPO_URL" 'v*' || true; } | awk '!done { sub(".*refs/tags/", ""); print; done = 1 }')"
+    BRANCH="${BRANCH:-main}"
+  fi
   BUILD_DIR="$SRC_DIR"
-  mkdir -p "$(dirname "$SRC_DIR")"
-  git clone --quiet --depth 1 --branch "$BRANCH" "$REPO_URL" "$SRC_DIR"
-  info "Staženo do $SRC_DIR"
+  if [ -d "$SRC_DIR/.git" ]; then
+    git -C "$SRC_DIR" fetch --quiet --depth 1 origin "$BRANCH"
+    git -C "$SRC_DIR" reset --quiet --hard FETCH_HEAD
+    git -C "$SRC_DIR" clean --quiet -fdx -e node_modules
+  else
+    mkdir -p "$(dirname "$SRC_DIR")"
+    git clone --quiet --depth 1 --branch "$BRANCH" "$REPO_URL" "$SRC_DIR"
+  fi
+  info "Verze $BRANCH ($(git -C "$SRC_DIR" log -1 --format='%h'))"
 fi
 
 # ---------------------------------------------------------------- build & install

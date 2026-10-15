@@ -119,9 +119,14 @@ export class Updater {
     const logFile = path.join(os.homedir(), ".local", "share", "vimmi", "update.log");
     fs.mkdirSync(path.dirname(logFile), { recursive: true });
     const log = fs.openSync(logFile, "w");
+    // Install exactly the released version (tested on CI), using that release's own installer.
+    const tag = /^\d+\.\d+\.\d+$/.test(this.status.version ?? "") ? `v${this.status.version}` : "main";
     const command =
-      process.env.VIMMI_UPDATE_COMMAND || `curl -fsSL https://raw.githubusercontent.com/${REPO}/main/install.sh | bash -s -- --update`;
-    const child = spawn("bash", ["-c", command], { stdio: ["ignore", log, log], env: { ...process.env, VIMMI_NONINTERACTIVE: "1" } });
+      process.env.VIMMI_UPDATE_COMMAND || `curl -fsSL https://raw.githubusercontent.com/${REPO}/${tag}/install.sh | bash -s -- --update`;
+    const child = spawn("bash", ["-c", command], {
+      stdio: ["ignore", log, log],
+      env: { ...process.env, VIMMI_NONINTERACTIVE: "1", ...(tag === "main" ? {} : { VIMMI_BRANCH: tag }) },
+    });
     child.on("close", (code) => {
       fs.closeSync(log);
       if (code === 0) this.set({ state: "ready" });

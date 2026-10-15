@@ -182,7 +182,7 @@ export function AiQuickPanel() {
             {q.status === "error" ? (
               <p className="error-text">{q.error}</p>
             ) : q.text ? (
-              <div dangerouslySetInnerHTML={{ __html: renderMarkdown(q.text) }} />
+              <div dangerouslySetInnerHTML={{ __html: renderMarkdown(q.text, { blockRemoteImages: true }) }} />
             ) : (
               <p className="muted thinking-dots">AI přemýšlí</p>
             )}

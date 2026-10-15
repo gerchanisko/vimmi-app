@@ -247,6 +247,12 @@ function createWindow(): void {
   });
   win.setMenuBarVisibility(false);
 
+  // The app only needs notifications (event reminders) and the clipboard; refuse camera,
+  // microphone, location, USB and everything else a malicious page or note could ask for.
+  const allowed = new Set(["notifications", "clipboard-sanitized-write", "clipboard-read"]);
+  win.webContents.session.setPermissionRequestHandler((_wc, permission, done) => done(allowed.has(permission)));
+  win.webContents.session.setPermissionCheckHandler((_wc, permission) => allowed.has(permission));
+
   // Links open in the system browser, never inside the app.
   win.webContents.setWindowOpenHandler(({ url }) => {
     if (/^https?:\/\//i.test(url)) void shell.openExternal(url);

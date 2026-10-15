@@ -386,7 +386,7 @@ function Message({
 
 function Part({ part, showThinking }: { part: ChatPart; showThinking: boolean }) {
   const html = useMemo(
-    () => (part.kind === "text" ? renderMarkdown(part.text, { resolve: (t) => resolveLink(t) }) : ""),
+    () => (part.kind === "text" ? renderMarkdown(part.text, { resolve: (t) => resolveLink(t), blockRemoteImages: true }) : ""),
     [part],
   );
   switch (part.kind) {
