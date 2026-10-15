@@ -22,6 +22,24 @@ export interface LoopContext {
   /** Runs a vault tool (with approval when needed) and updates the UI part. */
   runTool: (id: string, name: string, input: unknown, part: ToolPart | undefined) => Promise<{ content: string; isError: boolean }>;
   prices?: [number, number, number];
+  /** Gemini: every earlier tool call must carry a thought signature (see fillMissingSignatures). */
+  requiresThoughtSignatures?: boolean;
+}
+
+/**
+ * Gemini rejects tool calls in the history without a thought signature. Chats saved before Vimmi
+ * kept them (or made with another provider) get the placeholder Google documents for that case.
+ */
+function fillMissingSignatures(history: unknown[]): void {
+  for (const msg of history as { role?: string; tool_calls?: (Record<string, unknown> & { extra_content?: Record<string, unknown> })[] }[]) {
+    if (msg.role !== "assistant" || !msg.tool_calls?.length) continue;
+    msg.tool_calls.forEach((tc, i) => {
+      const google = (tc.extra_content?.google ?? {}) as { thought_signature?: string };
+      if (i === 0 && !google.thought_signature) {
+        tc.extra_content = { ...(tc.extra_content ?? {}), google: { ...google, thought_signature: "skip_thought_signature_validator" } };
+      }
+    });
+  }
 }
 
 const MAX_STEPS = 40;
@@ -198,6 +216,23 @@ interface PendingCall {
   id: string;
   name: string;
   args: string;
+  /**
+   * Provider data that must be sent back with the call. Gemini puts its thought signature here
+   * ({ google: { thought_signature } }) and rejects the next request without it.
+   */
+  extra?: Record<string, unknown>;
+}
+
+type ExtraContent = { extra_content?: Record<string, unknown> };
+
+/** Merges provider extras (e.g. Gemini's thought signature) that may arrive split across chunks. */
+function mergeExtra(into: Record<string, unknown> | undefined, add: Record<string, unknown> | undefined): Record<string, unknown> | undefined {
+  if (!add) return into;
+  const out: Record<string, unknown> = { ...(into ?? {}) };
+  for (const [k, v] of Object.entries(add)) {
+    out[k] = v && typeof v === "object" && !Array.isArray(v) ? { ...((out[k] as object) ?? {}), ...v } : v;
+  }
+  return out;
 }
 
 export async function runChatLoop(ctx: LoopContext): Promise<void> {
@@ -208,10 +243,13 @@ export async function runChatLoop(ctx: LoopContext): Promise<void> {
   }));
 
   for (let step = 0; step < MAX_STEPS; step++) {
+    if (ctx.requiresThoughtSignatures) fillMissingSignatures(history);
     const guard = firstTokenGuard(ctx.signal);
     let text = "";
     let finish: string | null = null;
     const calls: PendingCall[] = [];
+    // Gemini sometimes sends the signature on an earlier delta, before the tool calls.
+    let looseExtra: Record<string, unknown> | undefined;
     try {
     const stream = await client.chat.completions
       .create(
@@ -248,10 +286,12 @@ export async function runChatLoop(ctx: LoopContext): Promise<void> {
         text += delta.content;
         appendDelta(assistant, "text", delta.content, send);
       }
+      looseExtra = mergeExtra(looseExtra, (delta as ExtraContent).extra_content);
       for (const tc of delta.tool_calls ?? []) {
         const i = tc.index ?? calls.length;
         if (!calls[i]) calls[i] = { id: tc.id ?? `call_${step}_${i}`, name: "", args: "" };
         if (tc.id) calls[i].id = tc.id;
+        calls[i].extra = mergeExtra(calls[i].extra, (tc as ExtraContent).extra_content);
         if (tc.function?.name) {
           const first = !calls[i].name;
           calls[i].name += tc.function.name;
@@ -273,6 +313,7 @@ export async function runChatLoop(ctx: LoopContext): Promise<void> {
     finishText(assistant, send);
     assistant.parts = assistant.parts.filter((p) => !(p.kind === "thinking" && !p.text.trim()));
     const pending = calls.filter(Boolean);
+    if (looseExtra && pending.length && !pending.some((c) => c.extra)) pending[0].extra = looseExtra;
 
     if (finish === "length" && pending.length) {
       const note = "Odpověď byla příliš dlouhá a nedokončila se. Zkus požadavek rozdělit na menší části.";
@@ -287,7 +328,14 @@ export async function runChatLoop(ctx: LoopContext): Promise<void> {
       role: "assistant",
       content: text || null,
       ...(pending.length
-        ? { tool_calls: pending.map((c) => ({ id: c.id, type: "function", function: { name: c.name, arguments: c.args || "{}" } })) }
+        ? {
+            tool_calls: pending.map((c) => ({
+              id: c.id,
+              type: "function",
+              function: { name: c.name, arguments: c.args || "{}" },
+              ...(c.extra ? { extra_content: c.extra } : {}),
+            })),
+          }
         : {}),
     });
 
@@ -360,6 +408,7 @@ export function friendlyOpenAIError(err: unknown, providerName: string): string 
   }
   if (err instanceof OpenAI.RateLimitError) return `${providerName}: limit požadavků nebo kreditu je vyčerpaný. Zkus to za chvíli (bezplatné modely mají denní limity).`;
   if (err instanceof OpenAI.BadRequestError) {
+    if (/thought_signature/i.test(err.message)) return `${providerName}: model odmítl pokračovat v rozhovoru s nástroji. Začni nový chat. (${err.message})`;
     if (/tool|function/i.test(err.message)) return `${providerName}: tento model asi nepodporuje nástroje. Vyber jiný model. (${err.message})`;
     return `${providerName}: požadavek byl odmítnut: ${err.message}`;
   }

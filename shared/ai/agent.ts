@@ -296,6 +296,7 @@ export class Agent {
       signal,
       send,
       prices: info.prices?.[model],
+      requiresThoughtSignatures: provider === "gemini",
       runTool: (id: string, name: string, input: unknown, part: Extract<ChatPart, { kind: "tool" }> | undefined) =>
         this.runTool(id, name, input, part, vault, settings, signal, send),
     };
