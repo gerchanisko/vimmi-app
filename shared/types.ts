@@ -92,6 +92,8 @@ export interface Settings {
   calendarFolder: string;
   /** Subscribed read-only calendars (e.g. Google Calendar's private iCal address). Never synced. */
   calendars: CalendarSubscription[];
+  /** "Kalendář v telefonu": the secret gist with Vimmi's events (when turned on). */
+  calendarFeed?: { gistId: string; url: string };
   attachmentsFolder: string;
   templatesFolder: string;
   fontSize: number;

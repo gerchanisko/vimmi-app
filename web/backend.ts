@@ -12,6 +12,7 @@ import { DEFAULT_SETTINGS, type Settings, type SyncSettings, type UpdateStatus }
 import { Vault } from "../shared/vault";
 import { dailyNote, noteFromTemplate, templatePaths } from "../shared/vault-actions";
 import { IdbStorage, kvDelete, kvGet, kvSet, openDb } from "./idb-storage";
+import { CalendarFeed } from "../shared/calendar-feed";
 import { CalendarSubscriptions } from "../shared/calendar-subs";
 
 const SETTINGS_KEY = "vimmi:settings";
@@ -94,21 +95,20 @@ export async function installBackend(): Promise<void> {
     localStorage.setItem(VAULT_FLAG, "1");
     sync.restart();
     calendars.start();
+    feed.start();
   };
   const requireVault = () => {
     if (!vault) throw new Error("Trezor není otevřený.");
     return vault;
   };
 
-  const sync = new SyncManager(
-    () => vault,
-    () => {
-      const s = settings.sync;
-      const token = secrets.get("github");
-      if (!s.enabled || !token || !s.owner || !s.repo) return null;
-      return { owner: s.owner, repo: s.repo, branch: s.branch, token, device: deviceName(), apiBase: githubApi() };
-    },
-  );
+  const syncConfig = () => {
+    const s = settings.sync;
+    const token = secrets.get("github");
+    if (!s.enabled || !token || !s.owner || !s.repo) return null;
+    return { owner: s.owner, repo: s.repo, branch: s.branch, token, device: deviceName(), apiBase: githubApi() };
+  };
+  const sync = new SyncManager(() => vault, syncConfig);
   sync.on("status", (st) => bus.emit("sync:status", st));
   // Browsers usually may not download calendars from other sites (Google sends no CORS headers);
   // the desktop app downloads them into the vault and sync brings them here.
@@ -118,6 +118,13 @@ export async function installBackend(): Promise<void> {
     (subs) => saveSettings({ calendars: subs }),
   );
   calendars.on("status", (st) => bus.emit("calendar:status", st));
+  const feed = new CalendarFeed(
+    () => vault,
+    syncConfig,
+    () => settings.calendarFeed,
+    (f) => saveSettings({ calendarFeed: f }),
+  );
+  feed.on("status", (st) => bus.emit("calendar:feed-status", st));
   // Sync when the app comes back to the foreground (switching apps on a phone).
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "visible" && vault) void sync.syncNow({ quick: true });
@@ -269,6 +276,10 @@ export async function installBackend(): Promise<void> {
           return new TextDecoder().decode(await requireVault().readBytes(p));
         }),
       onStatus: (cb) => on("calendar:status", cb),
+      feedStatus: () => wrap(() => feed.status),
+      feedEnable: () => feed.enable(),
+      feedDisable: () => feed.disable(),
+      onFeedStatus: (cb) => on("calendar:feed-status", cb),
     },
     update: {
       status: () => wrap(() => update),

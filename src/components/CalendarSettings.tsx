@@ -1,8 +1,9 @@
 // Settings → Kalendář: subscribed calendars (Google Calendar and others) and .ics import.
 import { useEffect, useState } from "react";
 import { EVENT_COLORS, type EventColor } from "../../shared/calendar";
+import type { FeedStatus } from "../../shared/calendar-feed";
 import type { CalendarSubscription, CalendarSubscriptionStatus, Settings } from "../../shared/types";
-import { errorText, refreshSnapshot, setState, toast } from "../lib/store";
+import { confirm, errorText, refreshSnapshot, setState, toast } from "../lib/store";
 import { COLOR_VAR } from "./Calendar";
 import { Icon } from "./Icon";
 
@@ -86,6 +87,8 @@ export function CalendarSettingsPanel({ settings }: { settings: Settings }) {
       <p className="muted">
         Vidíš tu i události z jiných kalendářů, třeba z Google Kalendáře nebo školního rozvrhu. Jsou jen pro čtení – měníš je tam, odkud pocházejí.
       </p>
+
+      <PhoneFeed settings={settings} />
 
       <h4 className="settings-sub">Odebírané kalendáře</h4>
       {web && (
@@ -183,3 +186,84 @@ export function CalendarSettingsPanel({ settings }: { settings: Settings }) {
     </>
   );
 }
+
+/** "Kalendář v telefonu": Vimmi's events in the phone's own Calendar app, with reminders. */
+function PhoneFeed({ settings }: { settings: Settings }) {
+  const [status, setStatus] = useState<FeedStatus>({ state: settings.calendarFeed ? "ok" : "off", url: settings.calendarFeed?.url });
+  const syncReady = Boolean(settings.sync.enabled && settings.hasSyncToken);
+  useEffect(() => {
+    void window.vimmi.calendar.feedStatus().then(setStatus);
+    return window.vimmi.calendar.onFeedStatus(setStatus);
+  }, []);
+
+  const enable = async () => {
+    const st = await window.vimmi.calendar.feedEnable().catch((err) => ({ state: "error" as const, message: errorText(err) }));
+    setStatus(st);
+    setState({ settings: await window.vimmi.settings.get() });
+  };
+  const disable = async () => {
+    if (!(await confirm("Vypnout kalendář v telefonu?", "Odkaz přestane fungovat a telefon přestane dostávat nové události.", "Vypnout", true))) return;
+    setStatus(await window.vimmi.calendar.feedDisable());
+    setState({ settings: await window.vimmi.settings.get() });
+  };
+  const url = status.url ?? settings.calendarFeed?.url;
+  const webcal = url?.replace(/^https:/, "webcal:");
+
+  return (
+    <>
+      <h4 className="settings-sub">Kalendář v telefonu</h4>
+      <p className="muted small">
+        Tvoje události z Vimmi i v kalendáři telefonu – i s připomenutím, když je Vimmi zavřená. Vimmi je zveřejní na tajném odkazu (soukromý Gist na
+        tvém GitHubu) a telefon ho odebírá. Kdo odkaz zná, události uvidí – nikomu ho nedávej.
+      </p>
+      {!url && (
+        <>
+          {!syncReady && (
+            <p className="notice">
+              <Icon name="info" size={14} /> Nejdřív zapni synchronizaci s GitHubem (Nastavení → Synchronizace) – kalendář v telefonu používá stejný token.
+            </p>
+          )}
+          <button className="btn primary" disabled={!syncReady || status.state === "busy"} onClick={() => void enable()}>
+            {status.state === "busy" ? <Icon name="spinner" size={14} className="spin" /> : <Icon name="calendar" size={14} />} Zapnout kalendář v telefonu
+          </button>
+          <p className="muted small">
+            Token potřebuje navíc oprávnění <b>Gists: Read and write</b> (na GitHubu u tokenu v části <i>Account permissions</i>).
+          </p>
+        </>
+      )}
+      {status.state === "error" && status.message && <p className="error-text small">{status.message}</p>}
+      {url && (
+        <div className="feed-box">
+          <div className="feed-link">
+            <input readOnly value={url} onFocus={(e) => e.currentTarget.select()} aria-label="Odkaz na kalendář" />
+            <button className="btn small" onClick={() => void navigator.clipboard.writeText(url).then(() => toast("Odkaz zkopírován.", "ok"))}>
+              <Icon name="copy" size={13} /> Kopírovat
+            </button>
+          </div>
+          <p className="muted small">
+            {status.at ? `Naposledy nahráno ${ago(status.at)}. ` : ""}Vimmi odkaz aktualizuje sama pár sekund po každé změně události.
+          </p>
+          <details className="cal-help" open>
+            <summary>Jak ho přidat do telefonu</summary>
+            <p>
+              <b>iPhone:</b> otevři tuhle stránku na iPhonu a klepni na{" "}
+              <a href={webcal} className="external">
+                Přidat do kalendáře iPhonu
+              </a>{" "}
+              → <b>Odebírat</b>. Vypni přepínač <b>Odstranit upozornění</b>, jinak připomínky nepřijdou. Pro rychlejší aktualizace: Nastavení → Kalendář → Účty →
+              Stahovat nová data → <b>Každých 15 minut</b>.
+            </p>
+            <p>
+              <b>Android:</b> na počítači otevři <b>calendar.google.com</b> → vlevo <b>Ostatní kalendáře → + → Z adresy URL</b>, vlož odkaz a přidej. Google ho
+              obnovuje jen několikrát denně a vlastní upozornění z odběru nepřebírá – nastav si je u toho kalendáře v Google Kalendáři.
+            </p>
+          </details>
+          <button className="btn ghost danger-text" onClick={() => void disable()}>
+            Vypnout kalendář v telefonu
+          </button>
+        </div>
+      )}
+    </>
+  );
+}
+

@@ -89,7 +89,7 @@ export async function gitBlobSha(bytes: Uint8Array): Promise<string> {
 
 // ---------- GitHub API ----------
 
-class GitHub {
+export class GitHub {
   constructor(private cfg: SyncConfig) {}
 
   private get base() {

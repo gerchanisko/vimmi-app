@@ -2975,6 +2975,33 @@ label.check {
   line-height: 1.7;
 }
 
+.feed-box {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-m);
+  margin-bottom: 8px;
+}
+.feed-link {
+  display: flex;
+  gap: 8px;
+}
+.feed-link input {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--mono);
+  font-size: 12px;
+}
+.feed-box .cal-help p {
+  margin: 8px 0;
+  line-height: 1.55;
+}
+.feed-box > .btn {
+  align-self: flex-start;
+}
+
 /* event dialog */
 .event-dialog {
   width: min(480px, calc(100vw - 32px));

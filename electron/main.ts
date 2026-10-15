@@ -10,6 +10,7 @@ import { Agent } from "../shared/ai/agent";
 import { dailyNote as dailyNoteFor, noteFromTemplate, templatePaths } from "../shared/vault-actions";
 import os from "node:os";
 import { createPrivateRepo, githubUser } from "../shared/sync";
+import { CalendarFeed } from "../shared/calendar-feed";
 import { CalendarSubscriptions } from "../shared/calendar-subs";
 import { SyncManager } from "../shared/sync-manager";
 import { Updater } from "./updater";
@@ -41,15 +42,14 @@ const agent = new Agent({
 
 const githubApi = () => process.env.VIMMI_GITHUB_API || undefined;
 
-const sync = new SyncManager(
-  () => vault,
-  () => {
-    const s = loadSettings().sync;
-    const token = getSyncToken();
-    if (!s.enabled || !token || !s.owner || !s.repo) return null;
-    return { owner: s.owner, repo: s.repo, branch: s.branch, token, device: os.hostname() || "počítač", apiBase: githubApi() };
-  },
-);
+function syncConfig() {
+  const s = loadSettings().sync;
+  const token = getSyncToken();
+  if (!s.enabled || !token || !s.owner || !s.repo) return null;
+  return { owner: s.owner, repo: s.repo, branch: s.branch, token, device: os.hostname() || "počítač", apiBase: githubApi() };
+}
+
+const sync = new SyncManager(() => vault, syncConfig);
 sync.on("status", (st) => send("sync:status", st));
 
 const calendars = new CalendarSubscriptions(
@@ -58,6 +58,14 @@ const calendars = new CalendarSubscriptions(
   (subs) => saveSettings({ calendars: subs }),
 );
 calendars.on("status", (st) => send("calendar:status", st));
+
+const feed = new CalendarFeed(
+  () => vault,
+  syncConfig,
+  () => loadSettings().calendarFeed,
+  (f) => saveSettings({ calendarFeed: f }),
+);
+feed.on("status", (st) => send("calendar:feed-status", st));
 
 const updater = new Updater(
   (st) => send("update:status", st),
@@ -78,6 +86,7 @@ async function openVault(dir: string): Promise<void> {
   win?.setTitle(`${path.basename(v.root)} – Vimmi`);
   sync.restart();
   calendars.start();
+  feed.start();
 }
 
 function requireVault(): Vault {
@@ -189,6 +198,9 @@ function registerIpc(): void {
   handle("sync:status", () => sync.status);
   handle("sync:now", () => sync.syncNow());
   handle("calendar:status", () => calendars.status);
+  handle("calendar:feed-status", () => feed.status);
+  handle("calendar:feed-enable", () => feed.enable());
+  handle("calendar:feed-disable", () => feed.disable());
   handle("calendar:refresh", (id?: string) => calendars.refresh(id));
   handle("calendar:save", (subs: CalendarSubscription[]) => calendars.save(subs).then(() => loadSettings()));
   handle("calendar:read", async (rel: string) => {

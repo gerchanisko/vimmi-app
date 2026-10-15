@@ -1,6 +1,7 @@
 // Exposes a small, typed API to the renderer. The renderer never touches Node or the API key.
 import { contextBridge, ipcRenderer } from "electron";
 import type { ProviderId } from "../shared/providers";
+import type { FeedStatus } from "../shared/calendar-feed";
 import type { NoteVersion } from "../shared/history";
 import type {
   AiEvent,
@@ -92,6 +93,11 @@ const api = {
     /** Text of a .ics file in the vault. */
     read: (p: string) => invoke<string>("calendar:read", p),
     onStatus: (cb: (s: Record<string, CalendarSubscriptionStatus>) => void) => on("calendar:status", cb),
+    /** "Kalendář v telefonu" (secret gist feed). */
+    feedStatus: () => invoke<FeedStatus>("calendar:feed-status"),
+    feedEnable: () => invoke<FeedStatus>("calendar:feed-enable"),
+    feedDisable: () => invoke<FeedStatus>("calendar:feed-disable"),
+    onFeedStatus: (cb: (s: FeedStatus) => void) => on("calendar:feed-status", cb),
   },
   update: {
     status: () => invoke<UpdateStatus>("update:status"),

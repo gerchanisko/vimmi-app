@@ -180,6 +180,29 @@ try {
     await ph.screenshot({ path: path.join(shots, "sync-04-phone-offline.png") });
   });
 
+  await step("desktop publishes the phone calendar (secret gist) and keeps it up to date", async () => {
+    await pc.keyboard.press("Control+,");
+    await pc.click(".settings-nav >> text=Kalendář");
+    await pc.click("text=Zapnout kalendář v telefonu");
+    await pc.waitForSelector(".feed-link input", { timeout: 15000 });
+    const url = await pc.inputValue(".feed-link input");
+    if (!/^https:\/\/gist\.githubusercontent\.com\/me\/\w+\/raw\/vimmi\.ics$/.test(url)) throw new Error(`bad feed url ${url}`);
+    if (gh.gists.size !== 1 || [...gh.gists.values()][0].public) throw new Error("secret gist not created");
+    await pc.screenshot({ path: path.join(shots, "e2e-phone-calendar.png") });
+    await pc.keyboard.press("Escape");
+    // A new event appears in the gist a few seconds later.
+    const day = new Date(Date.now() + 86_400_000);
+    const ymd = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, "0")}-${String(day.getDate()).padStart(2, "0")}`;
+    fs.mkdirSync(path.join(vaultDir, "Kalendář"), { recursive: true });
+    fs.writeFileSync(
+      path.join(vaultDir, "Kalendář", `${ymd} Kadeřník.md`),
+      `---\ntype: event\ntitle: Kadeřník\ndate: ${ymd}\nstart: "15:00"\nend: "16:00"\nremind: 60\n---\n`,
+    );
+    await until("event in the gist", () => [...gh.gists.values()][0]?.files["vimmi.ics"]?.includes("SUMMARY:Kadeřník"), 30000);
+    const ics = [...gh.gists.values()][0].files["vimmi.ics"];
+    if (!ics.includes("TRIGGER:-PT60M")) throw new Error("reminder missing in the feed");
+  });
+
   await step("phone notices a new deploy and reloads into it", async () => {
     await ph.evaluate(() => localStorage.setItem("vimmi:dev-update-check", "1"));
     await ph.route("**/version.json*", (route) => route.fulfill({ contentType: "application/json", body: JSON.stringify({ version: "9.9.9", build: "novy-build" }) }));

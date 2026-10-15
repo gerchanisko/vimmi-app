@@ -12,6 +12,9 @@ class FakeGitHub {
   ref: string | null = null;
   failNextRefUpdate = false;
   requests = 0;
+  gists = new Map<string, { description: string; public: boolean; files: Record<string, string> }>();
+  /** Set to simulate a token without the Gists permission. */
+  gistsForbidden = false;
   private seq = 0;
 
   private id(prefix: string) {
@@ -53,6 +56,32 @@ class FakeGitHub {
     const b64 = (bytes: Uint8Array) => Buffer.from(bytes).toString("base64");
 
     if (method === "GET" && path === "") return json(200, { default_branch: "main" });
+    // Gists (for "Kalendář v telefonu")
+    if (url.pathname.startsWith("/gists")) {
+      if (this.gistsForbidden) return json(403, { message: "Resource not accessible by personal access token" });
+      const gist = (id: string) => {
+        const g = this.gists.get(id)!;
+        return { id, description: g.description, public: g.public, owner: { login: "me" }, files: Object.fromEntries(Object.entries(g.files).map(([n, c]) => [n, { content: c, raw_url: `https://gist.example/${id}/${n}` }])) };
+      };
+      if (method === "GET" && url.pathname === "/gists") return json(200, [...this.gists.keys()].map(gist));
+      if (method === "POST" && url.pathname === "/gists") {
+        const id = this.id("gist");
+        this.gists.set(id, { description: body.description, public: body.public, files: Object.fromEntries(Object.entries(body.files as Record<string, { content: string }>).map(([n, f]) => [n, f.content])) });
+        return json(201, gist(id));
+      }
+      const gm = url.pathname.match(/^\/gists\/(\w+)$/);
+      if (gm && !this.gists.has(gm[1])) return json(404, { message: "Not Found" });
+      if (gm && method === "GET") return json(200, gist(gm[1]));
+      if (gm && method === "PATCH") {
+        const g = this.gists.get(gm[1])!;
+        for (const [n, f] of Object.entries(body.files as Record<string, { content: string }>)) g.files[n] = f.content;
+        return json(200, gist(gm[1]));
+      }
+      if (gm && method === "DELETE") {
+        this.gists.delete(gm[1]);
+        return new Response(null, { status: 204 });
+      }
+    }
     if (method === "GET" && path === "/commits") {
       // Commits that changed a file, newest first (like GET /repos/{o}/{r}/commits?path=).
       const file = url.searchParams.get("path")!;
