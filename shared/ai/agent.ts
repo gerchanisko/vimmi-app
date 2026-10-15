@@ -563,7 +563,7 @@ export class Agent {
   }
 
   /** Checks the key, server and model (OpenAI-compatible servers: with a tiny request of a few tokens). */
-  async testKey(provider: ProviderId): Promise<{ ok: boolean; message: string; model?: string }> {
+  async testKey(provider: ProviderId): Promise<{ ok: boolean; message: string }> {
     const info = PROVIDER_MAP[provider];
     try {
       const model = providerModel(provider, this.host.settings().models);
@@ -576,35 +576,12 @@ export class Agent {
         return { ok: true, message: `Spojení funguje (${ids.length} modelů), ale model „${model}“ v seznamu není. Vyber jiný.` };
       }
       if (model && info.kind === "chat") {
-        // Being in the list does not mean the account may use it (NVIDIA, OpenRouter), and free
-        // servers differ a lot in speed: try the model (and, on free servers, the suggested ones).
-        const timed = async (m: string): Promise<number> => {
-          const started = Date.now();
-          await this.openaiClient(provider).chat.completions.create(
-            { model: m, messages: [{ role: "user", content: "Ahoj" }], max_tokens: 8 },
-            { timeout: 60_000, maxRetries: 0 },
-          );
-          return Date.now() - started;
-        };
-        const others = info.suggested.map((x) => x.id).filter((id) => id !== model && ids.includes(id));
-        const candidates = provider === "nvidia" ? [model, ...others] : [model];
-        const results = await Promise.all(
-          candidates.map((m) => timed(m).then((ms) => ({ m, ms, err: null as unknown }), (err: unknown) => ({ m, ms: Infinity, err }))),
+        // Being in the list does not mean the account may use it: try a tiny request.
+        await this.openaiClient(provider).chat.completions.create(
+          { model, messages: [{ role: "user", content: "Ahoj" }], max_tokens: 8 },
+          { timeout: 60_000, maxRetries: 0 },
         );
-        const working = results.filter((r) => r.err === null).sort((a, b) => a.ms - b.ms);
-        if (!working.length) throw results[0].err;
-        const current = results[0];
-        const best = working[0];
-        const times =
-          candidates.length > 1
-            ? ` Odezva: ${results.map((r) => `${r.m.split("/").pop()} ${r.err === null ? `${(r.ms / 1000).toFixed(1)} s` : "nejde"}`).join(", ")}.`
-            : "";
-        // Switch when the chosen model does not work, or is much slower than the best one.
-        if (best.m !== model && (current.err !== null || (current.ms > best.ms * 2 && current.ms - best.ms > 3000))) {
-          const why = current.err !== null ? "pro tvůj účet nefunguje" : "je výrazně pomalejší";
-          return { ok: true, model: best.m, message: `„${model}“ ${why}, přepnul jsem na „${best.m}“.${times}` };
-        }
-        return { ok: true, message: `Spojení funguje a model „${model}“ odpovídá.${times}` };
+        return { ok: true, message: `Spojení funguje a model „${model}“ odpovídá.` };
       }
       return { ok: true, message: `Spojení funguje. ${ids.length} dostupných modelů${model ? `, „${model}“ mezi nimi` : ""}.` };
     } catch (err) {
@@ -620,8 +597,7 @@ export class Agent {
     } else {
       for await (const m of this.openaiClient(provider).models.list()) ids.push(m.id.replace(/^models\//, ""));
     }
-    const hide = PROVIDER_MAP[provider].hideModels;
-    return [...new Set(ids)].filter((id) => !hide?.test(id)).sort((a, b) => a.localeCompare(b));
+    return [...new Set(ids)].sort((a, b) => a.localeCompare(b));
   }
 }
 

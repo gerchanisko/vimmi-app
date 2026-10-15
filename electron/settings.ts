@@ -2,7 +2,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { app, safeStorage } from "electron";
-import { PROVIDER_MAP, PROVIDERS, type ProviderId } from "../shared/providers";
+import { fallbackProvider, PROVIDER_MAP, PROVIDERS, type ProviderId } from "../shared/providers";
 import { DEFAULT_SETTINGS, type Settings } from "../shared/types";
 
 const settingsFile = () => path.join(app.getPath("userData"), "settings.json");
@@ -72,7 +72,8 @@ export function loadSettings(): Settings {
   const { model: legacyModel, ...rest } = stored;
   const merged = { ...DEFAULT_SETTINGS, ...rest, sync: { ...DEFAULT_SETTINGS.sync, ...(rest.sync ?? {}) } };
   if (legacyModel && !merged.models.anthropic) merged.models = { ...merged.models, anthropic: legacyModel };
-  if (!PROVIDER_MAP[merged.provider]) merged.provider = "anthropic";
+  if (!PROVIDER_MAP[merged.provider]) merged.provider = fallbackProvider((id) => Boolean(getApiKey(id)));
+  forgetRemovedProviderKeys();
   cache = { ...merged, ...derived(merged) };
   return cache;
 }
@@ -89,6 +90,15 @@ export function saveSettings(patch: Partial<Settings>): Settings {
 
 export function keyStorageIsEncrypted(): boolean {
   return safeStorage.isEncryptionAvailable() && safeStorage.getSelectedStorageBackend?.() !== "basic_text";
+}
+
+/** Deletes saved keys of providers that were removed from the app (e.g. NVIDIA in 0.4.5). */
+function forgetRemovedProviderKeys(): void {
+  const keys = readKeys();
+  const stale = Object.keys(keys).filter((id) => id !== "github" && !PROVIDER_MAP[id as ProviderId]);
+  if (!stale.length) return;
+  for (const id of stale) delete keys[id as ProviderId];
+  fs.writeFileSync(keysFile(), JSON.stringify(keys), { mode: 0o600 });
 }
 
 export function setApiKey(provider: ProviderId | "github", key: string | null): Settings {

@@ -5,7 +5,7 @@ import { sampleNotes } from "../electron/sample";
 import { Agent, friendlyError } from "../shared/ai/agent";
 import { Emitter } from "../shared/emitter";
 import { isoDate } from "../shared/markdown";
-import { PROVIDER_MAP, PROVIDERS, type ProviderId } from "../shared/providers";
+import { fallbackProvider, PROVIDER_MAP, PROVIDERS, type ProviderId } from "../shared/providers";
 import { createPrivateRepo, githubUser } from "../shared/sync";
 import { SyncManager } from "../shared/sync-manager";
 import { DEFAULT_SETTINGS, type Settings, type SyncSettings, type UpdateStatus } from "../shared/types";
@@ -37,6 +37,8 @@ export async function installBackend(): Promise<void> {
     const v = await kvGet<string>(db, "private", `secret/${id}`);
     if (v) secrets.set(id, v);
   }
+  // Keys of providers removed from the app (NVIDIA in 0.4.5) should not linger on the device.
+  for (const id of ["nvidia"]) void kvDelete(db, "private", `secret/${id}`).catch(() => {});
 
   // ---------- settings ----------
 
@@ -49,7 +51,9 @@ export async function installBackend(): Promise<void> {
   };
   try {
     const stored = JSON.parse(localStorage.getItem(SETTINGS_KEY) ?? "{}") as Partial<Settings>;
-    settings = derive({ ...DEFAULT_SETTINGS, ...stored, sync: { ...DEFAULT_SETTINGS.sync, ...(stored.sync ?? {}) } });
+    const merged = { ...DEFAULT_SETTINGS, ...stored, sync: { ...DEFAULT_SETTINGS.sync, ...(stored.sync ?? {}) } };
+    if (!PROVIDER_MAP[merged.provider]) merged.provider = fallbackProvider((id) => secrets.has(id));
+    settings = derive(merged);
   } catch {
     settings = derive({ ...DEFAULT_SETTINGS });
   }

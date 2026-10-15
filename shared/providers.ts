@@ -1,7 +1,7 @@
 // AI providers Vimmi can talk to. Shared by the main process and the settings UI.
 // Model names change often, so every provider can also load its live model list.
 
-export type ProviderId = "anthropic" | "openai" | "gemini" | "openrouter" | "nvidia" | "ollama" | "custom";
+export type ProviderId = "anthropic" | "openai" | "gemini" | "openrouter" | "ollama" | "custom";
 
 /** Which API shape the provider speaks. */
 export type ProviderKind = "anthropic" | "responses" | "chat";
@@ -22,10 +22,6 @@ export interface ProviderInfo {
   free?: boolean;
   /** Shown first, with a "doporučeno" badge. */
   recommended?: boolean;
-  /** Not callable from the web app (the server does not allow browser requests): the reason to show. */
-  desktopOnly?: string;
-  /** Models in the live list that are not chat models (embeddings, filters…) and should be hidden. */
-  hideModels?: RegExp;
   /** $ per million tokens [input, output, cache read] for the cost estimate. */
   prices?: Record<string, [number, number, number]>;
 }
@@ -65,28 +61,6 @@ export const PROVIDERS: ProviderInfo[] = [
     note: "Stovky modelů jedním klíčem, včetně Claude, GPT a Gemini. Modely s „:free“ na konci jsou zdarma (s limity). Načti seznam modelů.",
     free: true,
     recommended: true,
-  },
-  {
-    id: "nvidia",
-    name: "NVIDIA",
-    kind: "chat",
-    baseURL: "https://integrate.api.nvidia.com/v1",
-    needsKey: true,
-    keyUrl: "https://build.nvidia.com/settings/api-keys",
-    keyEnv: "NVIDIA_API_KEY",
-    // Some accounts get "Function not found" for some models (often Kimi), so the most widely
-    // available ones come first; "Otestovat spojení" switches to the first one that works.
-    defaultModel: "z-ai/glm-5.3",
-    suggested: [
-      { id: "z-ai/glm-5.3", label: "GLM 5.3 – doporučeno, dobře používá nástroje" },
-      { id: "deepseek-ai/deepseek-v4.1-flash", label: "DeepSeek V4.1 Flash – rychlý" },
-      { id: "nvidia/nemotron-3-super-120b-a12b", label: "Nemotron 3 Super – model od NVIDIE" },
-      { id: "moonshotai/kimi-k2.6", label: "Kimi K2.6 – na některých účtech nedostupný" },
-    ],
-    note: "Zdarma: klíč (začíná nvapi-) získáš po registraci na build.nvidia.com, omezení je kolem 40 dotazů za minutu. Podle podmínek NVIDIE je bezplatný přístup určený pro vývoj a vyzkoušení.",
-    free: true,
-    desktopOnly: "NVIDIA nepovoluje dotazy z prohlížeče, takže ve webové aplikaci (telefon) nefunguje. Na počítači ano.",
-    hideModels: /embed|rerank|reward|safety|guard|parse|retriever|clip|-vl-|vision|ocr|tts|asr|whisper|riva|cosmos|flux|stable-diffusion|sdxl|nv-?grounding|deplot|kosmos|paligemma|fuyu|neva|vila|detector|calibration/i,
   },
   {
     id: "openai",
@@ -159,4 +133,12 @@ export function providerModel(id: ProviderId, models: Partial<Record<ProviderId,
 export function providerBaseUrl(id: ProviderId, baseUrls: Partial<Record<ProviderId, string>>): string {
   const info = PROVIDER_MAP[id];
   return (info.editableBaseUrl && baseUrls[id]) || info.baseURL || "";
+}
+
+/**
+ * Provider to use when the saved one no longer exists (removed in an update): the first one
+ * with a saved key, otherwise Claude.
+ */
+export function fallbackProvider(hasKey: (id: ProviderId) => boolean): ProviderId {
+  return PROVIDERS.find((p) => p.needsKey && hasKey(p.id))?.id ?? "anthropic";
 }

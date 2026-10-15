@@ -152,7 +152,12 @@ await new Promise((r) => server.listen(0, "127.0.0.1", r));
 const apiUrl = `http://127.0.0.1:${server.address().port}`;
 
 // ---------- launch ----------
-fs.writeFileSync(path.join(userData, "settings.json"), JSON.stringify({ vaultPath: vaultDir, recentVaults: [vaultDir], theme: "light", approvalMode: "ask" }));
+// "nvidia" was removed in 0.4.5: an older saved choice must fall back to a provider that has a key.
+fs.writeFileSync(
+  path.join(userData, "settings.json"),
+  JSON.stringify({ vaultPath: vaultDir, recentVaults: [vaultDir], theme: "light", approvalMode: "ask", provider: "nvidia", models: { nvidia: "z-ai/glm-5.3" } }),
+);
+fs.writeFileSync(path.join(userData, "api-keys.json"), JSON.stringify({ nvidia: Buffer.from("plain:nvapi-old").toString("base64") }));
 // Create the sample vault the same way the app does on first run.
 const { sampleNotes } = await import("../dist-electron/sample-for-test.cjs");
 {
@@ -195,6 +200,10 @@ const read = (rel) => fs.readFileSync(path.join(vaultDir, rel), "utf8");
 try {
   await step("workspace opens with welcome note", async () => {
     await page.waitForSelector(".workspace", { timeout: 15000 });
+    const keys = JSON.parse(fs.readFileSync(path.join(userData, "api-keys.json"), "utf8"));
+    if (keys.nvidia) throw new Error("old NVIDIA key was not removed");
+    const provider = await page.evaluate(async () => (await window.vimmi.settings.get()).provider);
+    if (provider !== "anthropic") throw new Error(`expected fallback to anthropic, got ${provider}`);
     await page.waitForSelector(".cm-content");
     await page.waitForTimeout(400);
     await shot("01-welcome-note");

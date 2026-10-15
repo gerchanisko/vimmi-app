@@ -157,7 +157,6 @@ export default function Settings({ initialTab }: { initialTab?: string }) {
                         {p.recommended && <span className="pill accent">doporučeno</span>}
                         {p.free && <span className="pill">zdarma</span>}
                         {p.id === "ollama" && <span className="pill">lokálně</span>}
-                        {p.desktopOnly && window.vimmi.app.kind === "web" && <span className="pill">jen počítač</span>}
                         {settings.keys[p.id] && (
                           <span className="pill ok">
                             <Icon name="ok" size={12} /> klíč
@@ -299,12 +298,13 @@ function ProviderSettings({
   const [baseUrl, setBaseUrl] = useState(providerBaseUrl(provider, settings.baseUrls));
   const hasKey = settings.keys[provider];
 
+  const [testing, setTesting] = useState(false);
   const test = async () => {
     setBusy(true);
+    setTesting(true);
     setResult(null);
-    const r = await window.vimmi.settings.testKey(provider);
-    if (r.model) saveModel(r.model);
-    setResult(r);
+    setResult(await window.vimmi.settings.testKey(provider));
+    setTesting(false);
     setBusy(false);
   };
   const saveKey = async () => {
@@ -345,11 +345,6 @@ function ProviderSettings({
   return (
     <div className="provider-settings">
       <p className="muted">{info.note}</p>
-      {info.desktopOnly && window.vimmi.app.kind === "web" && (
-        <p className="notice">
-          <Icon name="alert" size={14} /> {info.desktopOnly}
-        </p>
-      )}
       {(info.needsKey || provider === "custom") && (
         <Row
           label="API klíč"
@@ -426,12 +421,28 @@ function ProviderSettings({
           </datalist>
           <div className="row-actions">
             <button className="btn" onClick={() => void loadModels()} disabled={busy}>
-              {busy ? "Načítám…" : "Načíst modely"}
+              {busy && !testing ? "Načítám…" : "Načíst modely"}
             </button>
             <button className="btn" onClick={() => void test()} disabled={busy}>
-              Otestovat spojení
+              {testing ? (
+                <>
+                  <Icon name="spinner" size={14} className="spin" /> Testuji…
+                </>
+              ) : (
+                "Otestovat spojení"
+              )}
             </button>
           </div>
+          {testing && (
+            <p className="muted small" role="status">
+              Posílám modelu krátký dotaz… U vytížených bezplatných serverů to může chvíli trvat.
+            </p>
+          )}
+          {result && (
+            <p className={result.ok ? "ok-text" : "error-text"} role="status">
+              {result.message}
+            </p>
+          )}
           {info.suggested.length > 0 && (
             <div className="model-suggestions">
               {info.suggested.map((m) => (
@@ -460,7 +471,6 @@ function ProviderSettings({
           )}
         </div>
       </Row>
-      {result && <p className={result.ok ? "ok-text" : "error-text"}>{result.message}</p>}
     </div>
   );
 }

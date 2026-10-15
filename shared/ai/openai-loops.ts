@@ -350,15 +350,12 @@ export async function streamText(
 /** Turns SDK errors from OpenAI-compatible servers into short Czech messages. */
 export function friendlyOpenAIError(err: unknown, providerName: string): string | null {
   if (err instanceof SlowModelError) {
-    return `${providerName}: model nezačal odpovídat do ${err.seconds} s – server je nejspíš přetížený (u bezplatných modelů se to stává). Zkus to znovu, nebo v Nastavení → AI klikni na „Otestovat spojení“ a Vimmi vybere nejrychlejší model.`;
+    return `${providerName}: model nezačal odpovídat do ${err.seconds} s – server je nejspíš přetížený (u bezplatných modelů se to stává). Zkus to znovu, nebo v Nastavení → AI vyber jiný model.`;
   }
   if (err instanceof OpenAI.AuthenticationError) return `${providerName}: API klíč je neplatný. Zkontroluj ho v Nastavení → AI.`;
   if (err instanceof OpenAI.PermissionDeniedError) return `${providerName}: klíč nemá přístup k tomuto modelu.`;
   if (err instanceof OpenAI.NotFoundError) {
     const detail = serverDetail(err);
-    if (/not found for account/i.test(detail)) {
-      return `${providerName}: tento model není pro tvůj účet dostupný (známý problém NVIDIE). V Nastavení → AI klikni na „Otestovat spojení“, Vimmi najde model, který funguje.`;
-    }
     return `${providerName}: model nebo adresa serveru nebyla nalezena${detail ? ` (${detail})` : ""}. Vyber jiný model v Nastavení → AI.`;
   }
   if (err instanceof OpenAI.RateLimitError) return `${providerName}: limit požadavků nebo kreditu je vyčerpaný. Zkus to za chvíli (bezplatné modely mají denní limity).`;
@@ -372,7 +369,7 @@ export function friendlyOpenAIError(err: unknown, providerName: string): string 
   return null;
 }
 
-/** The server's own explanation (OpenAI, NVIDIA and others put it in different fields). */
+/** The server's own explanation (servers put it in different fields). */
 function serverDetail(err: InstanceType<typeof OpenAI.APIError>): string {
   const body = err.error as { message?: string; detail?: string; title?: string } | undefined;
   const text = body?.detail || body?.message || (typeof err.error === "string" ? err.error : "") || "";

@@ -30,10 +30,10 @@ describe("security", () => {
 });
 
 describe("providers", async () => {
-  const { PROVIDER_MAP } = await import("../shared/providers");
-  it("NVIDIA lists only chat models", () => {
-    const hide = PROVIDER_MAP.nvidia.hideModels!;
-    for (const id of ["nvidia/nv-embedqa-mistral-7b-v2", "meta/llama-guard-4-12b", "nvidia/nemotron-4-340b-reward", "nvidia/nvclip"]) expect(hide.test(id)).toBe(true);
-    for (const id of ["moonshotai/kimi-k2.6", "deepseek-ai/deepseek-v4.1-flash", "z-ai/glm-5.3", "nvidia/nemotron-3-super-120b-a12b"]) expect(hide.test(id)).toBe(false);
+  const { fallbackProvider, PROVIDER_MAP } = await import("../shared/providers");
+  it("a removed provider (NVIDIA) falls back to one with a saved key", () => {
+    expect((PROVIDER_MAP as Record<string, unknown>).nvidia).toBeUndefined();
+    expect(fallbackProvider((id) => id === "openrouter" || id === "gemini")).toBe("openrouter");
+    expect(fallbackProvider(() => false)).toBe("anthropic");
   });
 });
