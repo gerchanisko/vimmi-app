@@ -33,7 +33,8 @@ describe("providers", async () => {
   const { fallbackProvider, PROVIDER_MAP } = await import("../shared/providers");
   it("a removed provider (NVIDIA) falls back to one with a saved key", () => {
     expect((PROVIDER_MAP as Record<string, unknown>).nvidia).toBeUndefined();
-    expect(fallbackProvider((id) => id === "openrouter" || id === "gemini")).toBe("openrouter");
+    expect(fallbackProvider((id) => id === "openrouter" || id === "gemini")).toBe("gemini");
+    expect(fallbackProvider((id) => id === "openrouter")).toBe("openrouter");
     expect(fallbackProvider(() => false)).toBe("anthropic");
   });
 });
