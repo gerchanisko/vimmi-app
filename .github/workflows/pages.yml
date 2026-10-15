@@ -1,5 +1,5 @@
 # Builds the web app (PWA for iPhone and browsers) and publishes it on GitHub Pages:
-# https://gerchanisko.github.io/vimmi-app/
+# https://app.vimmi.space/
 # It runs as part of a release (release.yml), so phones only get tested, released versions.
 # Run it by hand to redeploy the current main.
 name: Web app
