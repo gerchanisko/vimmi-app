@@ -302,7 +302,9 @@ function ProviderSettings({
   const test = async () => {
     setBusy(true);
     setResult(null);
-    setResult(await window.vimmi.settings.testKey(provider));
+    const r = await window.vimmi.settings.testKey(provider);
+    if (r.model) saveModel(r.model);
+    setResult(r);
     setBusy(false);
   };
   const saveKey = async () => {

@@ -117,7 +117,7 @@ Synchronizuje se automaticky při spuštění, každých 15 sekund a při návra
 | **OpenAI** | OpenAI SDK, Responses API | GPT-6.x. Nástroje, přemýšlení, hledání na webu; bezstavově (`store: false`). |
 | **Google Gemini** | OpenAI-kompatibilní endpoint | Flash modely mají bezplatnou úroveň. Klíč z Google AI Studia. |
 | **OpenRouter** – doporučeno | OpenAI-kompatibilní | Stovky modelů jedním klíčem, modely `:free` zdarma (s limity). |
-| **NVIDIA** – zdarma | OpenAI-kompatibilní | Klíč zdarma na [build.nvidia.com](https://build.nvidia.com), kolem 40 dotazů za minutu, modely jako Kimi K2.6, DeepSeek nebo GLM. Jen v aplikaci pro počítač (NVIDIA nepovoluje dotazy z prohlížeče). |
+| **NVIDIA** – zdarma | OpenAI-kompatibilní | Klíč zdarma na [build.nvidia.com](https://build.nvidia.com), kolem 40 dotazů za minutu, modely jako GLM, DeepSeek nebo Nemotron. Některé účty nemají přístup ke všem modelům (chyba „Function not found for account“) – „Otestovat spojení“ pak sám přepne na model, který funguje. Jen v aplikaci pro počítač (NVIDIA nepovoluje dotazy z prohlížeče). |
 | **Ollama** | OpenAI-kompatibilní, lokálně | Zdarma, poznámky neopustí počítač. Model musí podporovat nástroje (tools). |
 | **Vlastní** | OpenAI Chat Completions | LM Studio, vLLM, Groq, Mistral, DeepSeek… s vlastní adresou serveru. |
 

@@ -563,7 +563,7 @@ export class Agent {
   }
 
   /** Checks the key, server and model (OpenAI-compatible servers: with a tiny request of a few tokens). */
-  async testKey(provider: ProviderId): Promise<{ ok: boolean; message: string }> {
+  async testKey(provider: ProviderId): Promise<{ ok: boolean; message: string; model?: string }> {
     const info = PROVIDER_MAP[provider];
     try {
       const model = providerModel(provider, this.host.settings().models);
@@ -577,7 +577,24 @@ export class Agent {
       }
       if (model && info.kind === "chat") {
         // Being in the list does not mean the account may use it (NVIDIA, OpenRouter): try a tiny request.
-        await this.openaiClient(provider).chat.completions.create({ model, messages: [{ role: "user", content: "Ahoj" }], max_tokens: 8 });
+        const tryModel = async (m: string) => {
+          await this.openaiClient(provider).chat.completions.create({ model: m, messages: [{ role: "user", content: "Ahoj" }], max_tokens: 8 });
+        };
+        try {
+          await tryModel(model);
+        } catch (err) {
+          if (!(err instanceof OpenAI.NotFoundError)) throw err;
+          // NVIDIA lists some models that a given account cannot use ("Function not found for account").
+          for (const alt of info.suggested.map((s) => s.id).filter((id) => id !== model && ids.includes(id))) {
+            try {
+              await tryModel(alt);
+              return { ok: true, model: alt, message: `Model „${model}“ není pro tvůj účet dostupný, přepnul jsem na „${alt}“, který funguje.` };
+            } catch {
+              /* try the next one */
+            }
+          }
+          throw err;
+        }
         return { ok: true, message: `Spojení funguje a model „${model}“ odpovídá.` };
       }
       return { ok: true, message: `Spojení funguje. ${ids.length} dostupných modelů${model ? `, „${model}“ mezi nimi` : ""}.` };

@@ -31,7 +31,7 @@ const api = {
     get: () => invoke<Settings & { keyEncrypted: boolean }>("settings:get"),
     set: (patch: Partial<Settings>) => invoke<Settings>("settings:set", patch),
     setKey: (provider: ProviderId, key: string | null) => invoke<Settings>("settings:set-key", provider, key),
-    testKey: (provider: ProviderId) => invoke<{ ok: boolean; message: string }>("ai:test-key", provider),
+    testKey: (provider: ProviderId) => invoke<{ ok: boolean; message: string; model?: string }>("ai:test-key", provider),
     models: (provider: ProviderId) => invoke<string[]>("ai:models", provider),
   },
   vault: {

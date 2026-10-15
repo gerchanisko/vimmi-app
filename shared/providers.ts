@@ -74,12 +74,14 @@ export const PROVIDERS: ProviderInfo[] = [
     needsKey: true,
     keyUrl: "https://build.nvidia.com/settings/api-keys",
     keyEnv: "NVIDIA_API_KEY",
-    defaultModel: "moonshotai/kimi-k2.6",
+    // Some accounts get "Function not found" for some models (often Kimi), so the most widely
+    // available ones come first; "Otestovat spojení" switches to the first one that works.
+    defaultModel: "z-ai/glm-5.3",
     suggested: [
-      { id: "moonshotai/kimi-k2.6", label: "Kimi K2.6 – doporučeno, dobře používá nástroje" },
+      { id: "z-ai/glm-5.3", label: "GLM 5.3 – doporučeno, dobře používá nástroje" },
       { id: "deepseek-ai/deepseek-v4.1-flash", label: "DeepSeek V4.1 Flash – rychlý" },
-      { id: "z-ai/glm-5.3", label: "GLM 5.3 – silný na delší úlohy" },
       { id: "nvidia/nemotron-3-super-120b-a12b", label: "Nemotron 3 Super – model od NVIDIE" },
+      { id: "moonshotai/kimi-k2.6", label: "Kimi K2.6 – na některých účtech nedostupný" },
     ],
     note: "Zdarma: klíč (začíná nvapi-) získáš po registraci na build.nvidia.com, omezení je kolem 40 dotazů za minutu. Podle podmínek NVIDIE je bezplatný přístup určený pro vývoj a vyzkoušení.",
     free: true,

@@ -307,6 +307,9 @@ export function friendlyOpenAIError(err: unknown, providerName: string): string 
   if (err instanceof OpenAI.PermissionDeniedError) return `${providerName}: klíč nemá přístup k tomuto modelu.`;
   if (err instanceof OpenAI.NotFoundError) {
     const detail = serverDetail(err);
+    if (/not found for account/i.test(detail)) {
+      return `${providerName}: tento model není pro tvůj účet dostupný (známý problém NVIDIE). V Nastavení → AI klikni na „Otestovat spojení“, Vimmi najde model, který funguje.`;
+    }
     return `${providerName}: model nebo adresa serveru nebyla nalezena${detail ? ` (${detail})` : ""}. Vyber jiný model v Nastavení → AI.`;
   }
   if (err instanceof OpenAI.RateLimitError) return `${providerName}: limit požadavků nebo kreditu je vyčerpaný. Zkus to za chvíli (bezplatné modely mají denní limity).`;
