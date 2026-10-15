@@ -9,6 +9,7 @@
 // when the same file changed on both sides (the local one is saved as a "konflikt" copy).
 import { basename, dirname, isoDate, joinPath } from "./markdown";
 import { isIgnoredPath, isNotePath, type Vault } from "./vault";
+import type { NoteVersion } from "./history";
 
 export interface SyncConfig {
   owner: string;
@@ -336,3 +337,45 @@ export async function syncVault(vault: Vault, cfg: SyncConfig, opts: SyncOptions
 function pickPulled(base: Record<string, string>, pulled: string[]): Record<string, string> {
   return Object.fromEntries(pulled.filter((p) => base[p]).map((p) => [p, base[p]]));
 }
+
+// ---------- history from GitHub ----------
+
+interface CommitInfo {
+  sha: string;
+  commit: { message: string; author?: { date?: string }; committer?: { date?: string } };
+}
+
+async function defaultBranch(gh: GitHub, cfg: SyncConfig): Promise<string> {
+  if (cfg.branch) return cfg.branch;
+  const info = await gh.req<{ default_branch: string }>("GET", gh.repoPath());
+  return info.data.default_branch || "main";
+}
+
+/** Commits on GitHub that changed a file, newest first (each one is a version of the note). */
+export async function remoteHistory(cfg: SyncConfig, path: string, limit = 40): Promise<NoteVersion[]> {
+  const gh = new GitHub(cfg);
+  const branch = await defaultBranch(gh, cfg);
+  const r = await gh.req<CommitInfo[]>(
+    "GET",
+    gh.repoPath(`/commits?path=${encodeURIComponent(path)}&sha=${encodeURIComponent(branch)}&per_page=${limit}`),
+  );
+  return r.data.map((c) => ({
+    id: c.sha,
+    at: Date.parse(c.commit.committer?.date ?? c.commit.author?.date ?? "") || 0,
+    source: "github" as const,
+    device: c.commit.message.match(/^Vimmi \(([^)]+)\)/)?.[1],
+  }));
+}
+
+/** The note's content as it was in a commit, or null when it did not exist there. */
+export async function remoteVersion(cfg: SyncConfig, path: string, sha: string): Promise<string | null> {
+  if (!/^[\w-]{7,64}$/.test(sha)) return null;
+  const gh = new GitHub(cfg);
+  const c = await gh.req<{ tree: { sha: string } }>("GET", gh.repoPath(`/git/commits/${sha}`));
+  const t = await gh.req<{ tree: { path: string; type: string; sha: string }[] }>("GET", gh.repoPath(`/git/trees/${c.data.tree.sha}?recursive=1`));
+  const entry = t.data.tree.find((e) => e.type === "blob" && e.path === path);
+  if (!entry) return null;
+  const blob = await gh.req<{ content: string; encoding: string }>("GET", gh.repoPath(`/git/blobs/${entry.sha}`));
+  return blob.data.encoding === "base64" ? new TextDecoder().decode(fromBase64(blob.data.content)) : blob.data.content;
+}
+

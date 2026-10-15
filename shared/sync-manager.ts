@@ -2,7 +2,8 @@
 // A tick with no local changes is a quick check (one GitHub request); a full comparison runs when
 // something changed here or on GitHub, and every few minutes as a safety net.
 import { Emitter } from "./emitter";
-import { syncVault, type SyncConfig } from "./sync";
+import type { NoteVersion } from "./history";
+import { remoteHistory, remoteVersion, syncVault, type SyncConfig } from "./sync";
 import type { SyncStatus } from "./types";
 import type { Vault } from "./vault";
 
@@ -54,6 +55,17 @@ export class SyncManager extends Emitter {
     });
     this.interval = setInterval(() => void this.tick(), INTERVAL_MS);
     void this.syncNow();
+  }
+
+  /** Versions of a note on GitHub (empty when sync is off). */
+  async history(path: string): Promise<NoteVersion[]> {
+    const cfg = this.getConfig();
+    return cfg ? remoteHistory(cfg, path) : [];
+  }
+
+  async version(path: string, sha: string): Promise<string | null> {
+    const cfg = this.getConfig();
+    return cfg ? remoteVersion(cfg, path, sha) : null;
   }
 
   stop(): void {

@@ -1,6 +1,7 @@
 // Exposes a small, typed API to the renderer. The renderer never touches Node or the API key.
 import { contextBridge, ipcRenderer } from "electron";
 import type { ProviderId } from "../shared/providers";
+import type { NoteVersion } from "../shared/history";
 import type {
   AiEvent,
   Chat,
@@ -55,6 +56,11 @@ const api = {
     related: (p: string) => invoke<{ path: string; title: string; score: number }[]>("vault:related", p),
     daily: (date?: string) => invoke<string>("vault:daily", date),
     attachment: (name: string, data: Uint8Array) => invoke<string>("vault:attachment", name, data),
+    /** Versions of a note kept on this device, newest first. */
+    versions: (p: string) => invoke<NoteVersion[]>("vault:versions", p),
+    version: (p: string, id: string) => invoke<string | null>("vault:version", p, id),
+    /** Puts an old version back; the current text is kept in the history first. */
+    restore: (p: string, content: string) => invoke<NoteMeta>("vault:restore", p, content),
     templates: () => invoke<string[]>("vault:templates"),
     fromTemplate: (template: string, title: string, folder: string) => invoke<string>("vault:from-template", template, title, folder),
     reveal: (p: string) => invoke<void>("vault:reveal", p),
@@ -67,6 +73,9 @@ const api = {
   sync: {
     status: () => invoke<SyncStatus>("sync:status"),
     now: () => invoke<SyncStatus>("sync:now"),
+    /** Versions of a note on GitHub (empty when sync is off). */
+    history: (p: string) => invoke<NoteVersion[]>("sync:history", p),
+    version: (p: string, sha: string) => invoke<string | null>("sync:version", p, sha),
     setToken: (token: string | null) => invoke<Settings>("sync:set-token", token),
     user: () => invoke<string>("sync:user"),
     createRepo: (name: string) => invoke<{ owner: string; repo: string }>("sync:create-repo", name),

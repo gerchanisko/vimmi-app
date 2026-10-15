@@ -492,7 +492,8 @@ export class Agent {
           if (!ok) return finish("declined", "Uživatel tuto změnu zamítl. Nic se nezměnilo.");
         }
       }
-      const out = await tool.run(parsed.data, env);
+      // AI changes are always kept in the note history, so they can be undone.
+      const out = tool.write ? await vault.as("ai", () => tool.run(parsed.data, env)) : await tool.run(parsed.data, env);
       return finish("ok", out);
     } catch (err) {
       return finish("error", err instanceof Error ? err.message : String(err));

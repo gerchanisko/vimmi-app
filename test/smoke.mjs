@@ -384,6 +384,35 @@ try {
     if (!JSON.stringify(first.messages[0].content).includes("<open_note")) throw new Error("note context missing");
   });
 
+  await step("history: undo the AI edit by restoring the earlier version", async () => {
+    const before = read("Nápady.md");
+    await page.keyboard.press("Control+p");
+    await page.keyboard.type("historie verzí");
+    await page.keyboard.press("Enter");
+    const dialog = page.locator(".history");
+    await dialog.locator(".history-item", { hasText: "Před úpravou od AI" }).first().click();
+    await dialog.locator(".diff-line.add", { hasText: "plánování výletů" }).first().waitFor();
+    await shot("24-history");
+    await dialog.locator("text=Obnovit tuto verzi").click();
+    await page.click(".dialog button:text-is(\"Obnovit\")");
+    for (let i = 0; i < 20 && read("Nápady.md").includes("plánování výletů"); i++) await page.waitForTimeout(200);
+    if (read("Nápady.md").includes("plánování výletů")) throw new Error("version not restored");
+    if (!read("Nápady.md").includes("IMG_2041")) throw new Error("restored too far back");
+    // The editor shows the restored text, and the replaced text is in the history.
+    await page.locator(".tab-pane:not([hidden]) .cm-content").waitFor();
+    if ((await page.locator(".tab-pane:not([hidden]) .cm-content").innerText()).includes("plánování výletů")) throw new Error("editor not updated");
+    await page.keyboard.press("Control+p");
+    await page.keyboard.type("historie verzí");
+    await page.keyboard.press("Enter");
+    await dialog.locator(".history-item", { hasText: "Před obnovením" }).first().click();
+    const restored = await page.evaluate(async () => {
+      const list = await window.vimmi.vault.versions("Nápady.md");
+      return window.vimmi.vault.version("Nápady.md", list.find((v) => v.source === "restore").id);
+    });
+    if (restored !== before) throw new Error("text before restoring was not kept");
+    await page.keyboard.press("Escape");
+  });
+
   await step("AI quick action (summarize)", async () => {
     await page.locator(".tab-pane:not([hidden]) .note-actions .ai-btn").click();
     await page.click(".menu >> text=Shrnout");

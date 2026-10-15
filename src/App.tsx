@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { basename } from "../shared/markdown";
 import { AiQuickPanel } from "./components/AiQuick";
 import CalendarView from "./components/Calendar";
+import HistoryDialog from "./components/History";
 import GraphView from "./components/GraphView";
 import { Icon } from "./components/Icon";
 import { MenuHost, openMenu } from "./components/Menu";
@@ -96,6 +97,7 @@ export default function App() {
       {overlay?.type === "commands" && <CommandPalette />}
       {overlay?.type === "template" && <TemplatePicker />}
       {overlay?.type === "settings" && <Settings initialTab={overlay.tab} />}
+      {overlay?.type === "history" && <HistoryDialog path={overlay.path} />}
       <AiQuickPanel />
       {snapshot && <UpdateBanner />}
       <DialogHost />

@@ -207,6 +207,13 @@ export async function installBackend(): Promise<void> {
       related: (p) => wrap(() => requireVault().related(p)),
       daily: (date) => dailyNote(requireVault(), date ?? isoDate(), settings),
       attachment: (name, data) => requireVault().saveAttachment(name, data, settings.attachmentsFolder),
+      versions: (p) => wrap(() => requireVault().history.list(p)),
+      version: (p, id) => wrap(() => requireVault().history.read(p, id)),
+      restore: (p, content) =>
+        wrap(() => {
+          const v = requireVault();
+          return v.as("restore", () => v.write(p, content));
+        }),
       templates: () => wrap(() => templatePaths(requireVault(), settings.templatesFolder)),
       fromTemplate: (t, title, folder) => noteFromTemplate(requireVault(), t, title, folder),
       reveal: () => wrap(() => undefined),
@@ -218,6 +225,8 @@ export async function installBackend(): Promise<void> {
     sync: {
       status: () => wrap(() => sync.status),
       now: () => sync.syncNow(),
+      history: (p) => wrap(() => sync.history(p)),
+      version: (p, sha) => wrap(() => sync.version(p, sha)),
       setToken: (token) => setSecret("github", token),
       user: () =>
         wrap(() => {

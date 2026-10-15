@@ -480,7 +480,7 @@ function ToolCard({ part }: { part: Extract<ChatPart, { kind: "tool" }> }) {
   );
 }
 
-function DiffView({ before, after }: { before: string; after: string }) {
+export function DiffView({ before, after }: { before: string; after: string }) {
   const lines = useMemo(() => collapseDiff(lineDiff(before, after)), [before, after]);
   return (
     <div className="diff">

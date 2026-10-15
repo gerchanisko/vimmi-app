@@ -7,7 +7,7 @@ import { isMobile } from "./mobile";
 export type ViewKind = "today" | "calendar" | "tasks" | "projects" | "graph" | "search" | "tag";
 export type Tab = { id: string; kind: "note"; path: string; mode: "edit" | "read" } | { id: string; kind: "view"; view: ViewKind; arg?: string };
 export type RightPanel = "ai" | "links" | "outline" | "info";
-export type Overlay = null | { type: "spotlight"; query?: string } | { type: "commands" } | { type: "settings"; tab?: string } | { type: "template" };
+export type Overlay = null | { type: "spotlight"; query?: string } | { type: "commands" } | { type: "settings"; tab?: string } | { type: "template" } | { type: "history"; path: string };
 
 export interface Toast {
   id: number;

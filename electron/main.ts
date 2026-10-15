@@ -154,6 +154,12 @@ function registerIpc(): void {
   handle("vault:search", (q: string, opts?: Parameters<Vault["search"]>[1]) => requireVault().search(q, opts));
   handle("vault:backlinks", (rel: string) => requireVault().backlinks(rel));
   handle("vault:related", (rel: string) => requireVault().related(rel));
+  handle("vault:versions", (rel: string) => requireVault().history.list(rel));
+  handle("vault:version", (rel: string, id: string) => requireVault().history.read(rel, id));
+  handle("vault:restore", (rel: string, content: string) => {
+    const v = requireVault();
+    return v.as("restore", () => v.write(rel, content));
+  });
   handle("vault:daily", (date?: string) => dailyNote(date ?? isoDate()));
   handle("vault:attachment", (name: string, data: Uint8Array) =>
     requireVault().saveAttachment(name, data, loadSettings().attachmentsFolder),
@@ -173,6 +179,8 @@ function registerIpc(): void {
   // sync
   handle("sync:status", () => sync.status);
   handle("sync:now", () => sync.syncNow());
+  handle("sync:history", (rel: string) => sync.history(rel));
+  handle("sync:version", (rel: string, sha: string) => sync.version(rel, sha));
   handle("sync:set-token", (token: string | null) => setApiKey("github", token));
   handle("sync:user", async () => {
     const token = getSyncToken();

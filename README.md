@@ -93,6 +93,7 @@ Synchronizuje se automaticky při spuštění, každých 15 sekund a při návra
 - Přehled **Dnes**: po termínu, dnes, důležité, příštích 7 dní, naposledy upravené
 - Přehled **Úkoly** s filtry a seskupením podle poznámky, termínu nebo priority; rychlé přidání úkolu („zítra !1“)
 - **Obrázky** přímo v poznámkách: vlož je ze schránky, přetažením nebo tlačítkem (na telefonu z galerie či fotoaparátu). V editoru se hned ukážou, kliknutím je otevřeš přes celou obrazovku. Velké fotky se při vložení zmenší (max. 2400 px), aby poznámky i synchronizace zůstaly rychlé. Ukládají se do složky `Přílohy/` jako `![](Přílohy/foto.jpg)`, velikost jde nastavit jako `![popis|300](…)`.
+- **Historie verzí**: u každé poznámky (… → Historie verzí) vidíš starší verze, co se od nich změnilo, a jedním klikem je obnovíš. Vimmi si verzi ukládá při psaní (nejvýš jednou za 10 minut) a vždycky před úpravou od AI, před přepsáním synchronizací a před smazáním – takže jde vrátit i to, co pokazí AI. Se synchronizací přibude i dlouhodobá historie z GitHubu.
 - **Kalendář** jako Google Kalendář: měsíc, týden, den a seznam; události přetáhneš na jiný čas nebo den, natáhneš jejich délku, mohou se opakovat a připomenout se upozorněním. Každá událost je obyčejná poznámka ve složce `Kalendář/` (`type: event`, `date`, `start`, `end`), takže se synchronizuje a funguje i v Obsidianu. Úkoly s termínem jsou v kalendáři taky. Stačí AI napsat „zítra v 10 mám doktora“.
 - **Projekty**: poznámka s `type: project`, poznámky k projektu přes `project: Název`; postup, další úkoly, propojené poznámky
 

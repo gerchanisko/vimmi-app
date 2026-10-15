@@ -8,7 +8,7 @@ export
 class FakeGitHub {
   blobs = new Map<string, Uint8Array>();
   trees = new Map<string, Record<string, string>>();
-  commits = new Map<string, { tree: string; parents: string[] }>();
+  commits = new Map<string, { tree: string; parents: string[]; message?: string; date?: string }>();
   ref: string | null = null;
   failNextRefUpdate = false;
   requests = 0;
@@ -18,11 +18,11 @@ class FakeGitHub {
     return `${prefix}${(++this.seq).toString(16).padStart(8, "0")}`;
   }
 
-  private commit(files: Record<string, string>, parent: string | null) {
+  private commit(files: Record<string, string>, parent: string | null, message = "Externí změna") {
     const tree = this.id("tree");
     this.trees.set(tree, files);
     const sha = this.id("commit");
-    this.commits.set(sha, { tree, parents: parent ? [parent] : [] });
+    this.commits.set(sha, { tree, parents: parent ? [parent] : [], message, date: new Date().toISOString() });
     return sha;
   }
 
@@ -53,6 +53,19 @@ class FakeGitHub {
     const b64 = (bytes: Uint8Array) => Buffer.from(bytes).toString("base64");
 
     if (method === "GET" && path === "") return json(200, { default_branch: "main" });
+    if (method === "GET" && path === "/commits") {
+      // Commits that changed a file, newest first (like GET /repos/{o}/{r}/commits?path=).
+      const file = url.searchParams.get("path")!;
+      const out: unknown[] = [];
+      for (let sha = this.ref; sha; sha = this.commits.get(sha)!.parents[0] ?? null) {
+        const c = this.commits.get(sha)!;
+        const parent = c.parents[0] ? this.commits.get(c.parents[0]) : undefined;
+        const now = this.trees.get(c.tree)![file];
+        const before = parent ? this.trees.get(parent.tree)![file] : undefined;
+        if (now !== before) out.push({ sha, commit: { message: c.message ?? "", committer: { date: c.date } } });
+      }
+      return json(200, out);
+    }
     if (method === "GET" && path === "/git/ref/heads/main") {
       return this.ref ? json(200, { object: { sha: this.ref } }) : json(409, { message: "Git Repository is empty." });
     }
@@ -91,7 +104,7 @@ class FakeGitHub {
     }
     if (method === "POST" && path === "/git/commits") {
       const sha = this.id("commit");
-      this.commits.set(sha, { tree: body.tree, parents: body.parents });
+      this.commits.set(sha, { tree: body.tree, parents: body.parents, message: body.message, date: new Date(Date.now() + this.seq).toISOString() });
       return json(201, { sha });
     }
     if (method === "PATCH" && path === "/git/refs/heads/main") {

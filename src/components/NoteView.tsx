@@ -116,6 +116,7 @@ export default function NoteView({ tabId, path, mode, active }: Props) {
     openMenu(rect, [
       { label: bookmarked ? "Odebrat ze záložek" : "Přidat do záložek", icon: "star", action: () => toggleBookmark(path) },
       { label: "Přejmenovat…", icon: "rename", action: () => void renamePath(path) },
+      { label: "Historie verzí…", icon: "history", action: () => setState({ overlay: { type: "history", path } }) },
       { label: "Exportovat do PDF…", icon: "pdf", action: () => void exportPdf(path, content ?? "") },
       { label: "Kopírovat jako Markdown", icon: "copy", action: () => void navigator.clipboard.writeText(content ?? "").then(() => toast("Zkopírováno.", "ok")) },
       { label: "Kopírovat odkaz [[…]]", icon: "link", action: () => void navigator.clipboard.writeText(`[[${basename(path)}]]`).then(() => toast("Odkaz zkopírován.", "ok")) },

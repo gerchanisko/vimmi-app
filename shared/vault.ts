@@ -19,6 +19,7 @@ import {
   toggleTaskInLine,
 } from "./markdown";
 import type { NoteMeta, Priority, SearchHit, Task, VaultSnapshot } from "./types";
+import { NoteHistory, type VersionSource } from "./history";
 
 export interface FileStat {
   mtime: number;
@@ -101,10 +102,35 @@ export class Vault extends Emitter {
   private unwatch?: () => void;
   /** Folder whose notes are templates: their checkboxes are not real tasks. */
   templatesFolder = "";
+  readonly history: NoteHistory;
+  /** Who is changing notes right now (the AI marks its edits so they are always kept in history). */
+  private actor: VersionSource = "edit";
 
   constructor(storage: VaultStorage) {
     super();
     this.storage = storage;
+    this.history = new NoteHistory(storage);
+  }
+
+  /** Runs `fn` with its note changes recorded as made by `source` (e.g. "ai"). */
+  async as<T>(source: VersionSource, fn: () => Promise<T> | T): Promise<T> {
+    const before = this.actor;
+    this.actor = source;
+    try {
+      return await fn();
+    } finally {
+      this.actor = before;
+    }
+  }
+
+  /** Keeps the previous content in the history. Never blocks or fails the change itself. */
+  private async keepVersion(rel: string, previous: string | undefined, next: string | null, source: VersionSource): Promise<void> {
+    if (previous === undefined || previous === next) return;
+    try {
+      await this.history.capture(rel, previous, source);
+    } catch {
+      /* history is best effort */
+    }
   }
 
   get root(): string {
@@ -213,6 +239,7 @@ export class Vault extends Emitter {
     }
     const content = await this.storage.readText(rel).catch(() => null);
     if (content === null || this.notes.get(rel)?.content === content) return;
+    await this.keepVersion(rel, this.notes.get(rel)?.content, content, "disk");
     this.index(rel, content, stat);
     this.ensureFolders(rel);
     this.changed([rel], true);
@@ -350,7 +377,8 @@ export class Vault extends Emitter {
 
   // ---------- writing ----------
 
-  private async writeNote(rel: string, content: string): Promise<void> {
+  private async writeNote(rel: string, content: string, source: VersionSource = this.actor): Promise<void> {
+    await this.keepVersion(rel, this.notes.get(rel)?.content, content, source);
     const stat = await this.storage.writeText(rel, content);
     this.index(rel, content, stat);
     this.ensureFolders(rel);
@@ -369,7 +397,7 @@ export class Vault extends Emitter {
     rel = cleanPath(rel);
     if (isNotePath(rel)) {
       const content = new TextDecoder().decode(data);
-      await this.writeNote(rel, content);
+      await this.writeNote(rel, content, "sync");
     } else {
       await this.storage.writeBytes(rel, data);
       this.files.add(rel);
@@ -430,6 +458,7 @@ export class Vault extends Emitter {
       : [[from, to]];
 
     await this.storage.rename(from, to);
+    for (const [a, b] of moves) await this.history.move(a, b).catch(() => {});
 
     const before = new Map(moves);
     const entries = moves.map(([a]) => this.notes.get(a)!);
@@ -478,6 +507,7 @@ export class Vault extends Emitter {
   /** Moves a note, folder or file into the vault's trash instead of deleting it. */
   async trash(rel: string): Promise<void> {
     rel = cleanPath(rel);
+    for (const [p, e] of this.notes) if (p === rel || p.startsWith(rel + "/")) await this.keepVersion(p, e.content, null, "trash");
     await this.storage.trash(rel);
     this.notes.delete(rel);
     this.files.delete(rel);
