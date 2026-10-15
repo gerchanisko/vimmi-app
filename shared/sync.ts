@@ -28,12 +28,27 @@ export interface SyncResult {
   deletedRemote: string[];
   conflicts: string[];
   commit?: string;
+  /** A quick check found no new commit on GitHub (nothing was compared). */
+  unchanged?: boolean;
 }
 
 interface SyncState {
   repo: string;
   base: Record<string, string>;
+  /** Remote commit and branch after the last successful sync (for quick checks). */
+  commit?: string;
+  branch?: string;
 }
+
+export interface SyncOptions {
+  /**
+   * Nothing changed locally since the last sync: only ask GitHub whether the branch moved
+   * (one request) and skip the full comparison if it did not.
+   */
+  quick?: boolean;
+}
+
+const emptyResult = (): SyncResult => ({ pulled: [], pushed: [], deletedLocal: [], deletedRemote: [], conflicts: [] });
 
 const STATE_FILE = "sync.json";
 const MARKER = ".vimmi-sync";
@@ -191,17 +206,22 @@ export async function forgetSyncState(vault: Vault): Promise<void> {
 }
 
 /** Runs one full two-way sync. Safe to call repeatedly; does nothing when everything matches. */
-export async function syncVault(vault: Vault, cfg: SyncConfig): Promise<SyncResult> {
+export async function syncVault(vault: Vault, cfg: SyncConfig, opts: SyncOptions = {}): Promise<SyncResult> {
   const gh = new GitHub(cfg);
   const repoId = `${cfg.owner}/${cfg.repo}`.toLowerCase();
-  let branch = cfg.branch;
+  const state = await loadState(vault);
+  const sameRepo = state?.repo === repoId;
+  let branch = cfg.branch || (sameRepo ? state?.branch : undefined);
   if (!branch) {
     const info = await gh.req<{ default_branch: string }>("GET", gh.repoPath());
     branch = info.data.default_branch || "main";
   }
-  const state = await loadState(vault);
+  if (opts.quick && sameRepo && state?.commit) {
+    const ref = await gh.req<{ object: { sha: string } }>("GET", gh.repoPath(`/git/ref/heads/${encodeURIComponent(branch)}`), undefined, [404, 409]);
+    if (ref.status === 200 && ref.data.object.sha === state.commit) return { ...emptyResult(), unchanged: true };
+  }
   // A different repository than last time starts from scratch (nothing is deleted on first sync).
-  const base: Record<string, string> = state && state.repo === repoId ? state.base : {};
+  const base: Record<string, string> = sameRepo && state ? state.base : {};
 
   for (let attempt = 0; attempt < 3; attempt++) {
     let remote = await remoteTree(gh, branch);
@@ -218,7 +238,7 @@ export async function syncVault(vault: Vault, cfg: SyncConfig): Promise<SyncResu
       local[f.path] = await gitBlobSha(bytes);
     }
 
-    const result: SyncResult = { pulled: [], pushed: [], deletedLocal: [], deletedRemote: [], conflicts: [] };
+    const result = emptyResult();
     const pulls: [string, string][] = [];
     const pushes: string[] = [];
     const remoteDeletes: string[] = [];
@@ -306,7 +326,8 @@ export async function syncVault(vault: Vault, cfg: SyncConfig): Promise<SyncResu
       result.deletedRemote = remoteDeletes;
     }
 
-    await vault.storage.writePrivate(STATE_FILE, JSON.stringify({ repo: repoId, base: nextBase } satisfies SyncState));
+    const saved: SyncState = { repo: repoId, base: nextBase, commit: result.commit ?? remote.commit ?? undefined, branch };
+    await vault.storage.writePrivate(STATE_FILE, JSON.stringify(saved));
     return result;
   }
   throw new SyncError("Synchronizace se nepodařila – repozitář se mezitím změnil. Zkus to znovu.");

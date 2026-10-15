@@ -106,9 +106,9 @@ export async function installBackend(): Promise<void> {
   sync.on("status", (st) => bus.emit("sync:status", st));
   // Sync when the app comes back to the foreground (switching apps on a phone).
   document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "visible" && vault) void sync.syncNow();
+    if (document.visibilityState === "visible" && vault) void sync.syncNow({ quick: true });
   });
-  window.addEventListener("online", () => vault && void sync.syncNow());
+  window.addEventListener("online", () => vault && void sync.syncNow({ quick: true }));
 
   if (!storage.isEmpty() || localStorage.getItem(VAULT_FLAG)) await openVault();
 

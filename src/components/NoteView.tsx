@@ -5,7 +5,8 @@ import { loadDoc, saveDoc, subscribeDoc, updateDoc } from "../lib/docs";
 import { renderNote } from "../lib/render";
 import { errorText, getState, openView, resolveLink, setState, toast, useApp } from "../lib/store";
 import { QUICK_ACTIONS, runQuick } from "./AiQuick";
-import Editor, { followLink } from "./Editor";
+import Editor, { followLink, insertPickedImages } from "./Editor";
+import { openLightbox } from "../lib/editor-images";
 import { Icon } from "./Icon";
 import { openMenu, type MenuItem } from "./Menu";
 
@@ -74,6 +75,10 @@ export default function NoteView({ tabId, path, mode, active }: Props) {
       if (!m) return;
       lines[line] = lines[line].replace(/\[([ xX])\]/, m[2] === " " ? "[x]" : "[ ]");
       onChange(lines.join("\n"));
+      return;
+    }
+    if (el instanceof HTMLImageElement && !link) {
+      openLightbox(el.src, el.alt);
       return;
     }
     if (!link) return;
@@ -152,6 +157,11 @@ export default function NoteView({ tabId, path, mode, active }: Props) {
           <button className="icon-btn" onClick={toggleMode} title={mode === "edit" ? "Náhled (Ctrl+E)" : "Upravit (Ctrl+E)"}>
             <Icon name={mode === "edit" ? "book" : "pen"} />
           </button>
+          {mode === "edit" && (
+            <button className="icon-btn" onClick={() => void insertPickedImages(path)} title="Vložit obrázek" aria-label="Vložit obrázek">
+              <Icon name="image" />
+            </button>
+          )}
           <button className="btn ai-btn" onClick={aiMenu} title="AI akce">
             <Icon name="sparkle" /> AI
           </button>

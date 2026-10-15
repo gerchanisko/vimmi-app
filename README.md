@@ -67,7 +67,7 @@ Poznámky se synchronizují přes **soukromý repozitář na tvém GitHubu** –
 2. Vytvoř [token](https://github.com/settings/personal-access-tokens/new) s přístupem jen k tomuto repozitáři a oprávněním *Contents: Read and write*.
 3. Ve Vimmi otevři **Nastavení → Synchronizace**, vlož token a repozitář a zapni synchronizaci. Totéž na dalších zařízeních.
 
-Synchronizuje se automaticky při spuštění, chvíli po úpravě, každou minutu a při návratu do aplikace. Když stejnou poznámku upravíš na dvou zařízeních zároveň, nic se neztratí – druhá verze se uloží vedle jako „…(konflikt zařízení datum)“. Smazané poznámky jdou do koše. Token je na počítači zašifrovaný v systémové klíčence, v prohlížeči se ukládá v úložišti daného zařízení.
+Synchronizuje se automaticky při spuštění, každých 15 sekund a při návratu do aplikace (v klidu to je jen jeden krátký dotaz na GitHub). Když stejnou poznámku upravíš na dvou zařízeních zároveň, nic se neztratí – druhá verze se uloží vedle jako „…(konflikt zařízení datum)“. Smazané poznámky jdou do koše. Token je na počítači zašifrovaný v systémové klíčence, v prohlížeči se ukládá v úložišti daného zařízení.
 
 ## Snímky
 
@@ -92,6 +92,7 @@ Synchronizuje se automaticky při spuštění, chvíli po úpravě, každou minu
 - Úkol je řádek `- [ ] text` v jakékoliv poznámce, termín `@2026-10-14`, priorita `!1`–`!3` (kompatibilní i s emoji formátem Obsidian Tasks)
 - Přehled **Dnes**: po termínu, dnes, důležité, příštích 7 dní, naposledy upravené
 - Přehled **Úkoly** s filtry a seskupením podle poznámky, termínu nebo priority; rychlé přidání úkolu („zítra !1“)
+- **Obrázky** přímo v poznámkách: vlož je ze schránky, přetažením nebo tlačítkem (na telefonu z galerie či fotoaparátu). V editoru se hned ukážou, kliknutím je otevřeš přes celou obrazovku. Velké fotky se při vložení zmenší (max. 2400 px), aby poznámky i synchronizace zůstaly rychlé. Ukládají se do složky `Přílohy/` jako `![](Přílohy/foto.jpg)`, velikost jde nastavit jako `![popis|300](…)`.
 - **Kalendář** jako Google Kalendář: měsíc, týden, den a seznam; události přetáhneš na jiný čas nebo den, natáhneš jejich délku, mohou se opakovat a připomenout se upozorněním. Každá událost je obyčejná poznámka ve složce `Kalendář/` (`type: event`, `date`, `start`, `end`), takže se synchronizuje a funguje i v Obsidianu. Úkoly s termínem jsou v kalendáři taky. Stačí AI napsat „zítra v 10 mám doktora“.
 - **Projekty**: poznámka s `type: project`, poznámky k projektu přes `project: Název`; postup, další úkoly, propojené poznámky
 

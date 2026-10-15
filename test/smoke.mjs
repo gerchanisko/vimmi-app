@@ -263,6 +263,50 @@ try {
     await shot("08-graph");
   });
 
+  await step("images: insert from the picker, shrink, show in the editor and full size", async () => {
+    await page.click(".side-scroll >> text=Nápady");
+    const pane = page.locator(".tab-pane:not([hidden])");
+    await pane.locator(".cm-content").click();
+    await page.keyboard.press("Control+End");
+    // A 3000 × 2000 photo-like PNG made in the page.
+    const b64 = await page.evaluate(() => {
+      const c = document.createElement("canvas");
+      c.width = 3000;
+      c.height = 2000;
+      const g = c.getContext("2d");
+      const grad = g.createLinearGradient(0, 0, 3000, 2000);
+      grad.addColorStop(0, "#5f7fc9");
+      grad.addColorStop(1, "#c4913f");
+      g.fillStyle = grad;
+      g.fillRect(0, 0, 3000, 2000);
+      for (let i = 0; i < 4000; i++) {
+        g.fillStyle = `hsl(${i % 360} 60% 50%)`;
+        g.fillRect((i * 97) % 3000, (i * 53) % 2000, 18, 18);
+      }
+      return c.toDataURL("image/png").split(",")[1];
+    });
+    const [chooser] = await Promise.all([page.waitForEvent("filechooser"), pane.locator(".note-actions button[aria-label='Vložit obrázek']").click()]);
+    await chooser.setFiles({ name: "IMG_2041.png", mimeType: "image/png", buffer: Buffer.from(b64, "base64") });
+    for (let i = 0; i < 40 && !/IMG_2041/.test(read("Nápady.md")); i++) await page.waitForTimeout(250);
+    const note = read("Nápady.md");
+    const m = note.match(/!\[\]\((Přílohy\/IMG_2041\.webp)\)/u);
+    if (!m) throw new Error(`image link missing:\n${note}`);
+    const saved = fs.readFileSync(path.join(vaultDir, decodeURIComponent(m[1])));
+    if (saved.length > 1_500_000) throw new Error(`image not shrunk: ${saved.length} B`);
+    // Move the cursor away: the line turns into the picture.
+    await page.keyboard.press("Control+Home");
+    const img = pane.locator(".cm-image img").first();
+    await img.waitFor();
+    const size = await img.evaluate((el) => (el.complete ? el.naturalWidth : new Promise((r) => (el.onload = () => r(el.naturalWidth)))));
+    if (size !== 2400) throw new Error(`expected 2400 px wide, got ${size}`);
+    await shot("22-image-editor");
+    await pane.locator(".cm-image-zoom").first().click({ force: true });
+    await page.locator(".lightbox img").waitFor();
+    await shot("23-image-lightbox");
+    await page.keyboard.press("Escape");
+    if (await page.locator(".lightbox").count()) throw new Error("lightbox did not close");
+  });
+
   await step("calendar: new event, drag to another time, month and list views", async () => {
     await page.click(".side-nav >> text=Kalendář");
     const cal = page.locator(".tab-pane:not([hidden]) .calendar");

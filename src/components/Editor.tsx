@@ -21,6 +21,7 @@ import {
 import { tags as t } from "@lezer/highlight";
 import { vim } from "@replit/codemirror-vim";
 import { basename } from "../../shared/markdown";
+import { imagePreview, insertImages, pickImages } from "../lib/editor-images";
 import { getState, openNote, openView, resolveLink, setState, toast } from "../lib/store";
 
 // ---------- registry so other parts of the UI (AI actions) can reach the active editor ----------
@@ -478,6 +479,7 @@ export default function Editor({ path, value, onChange, jumpLine, active }: Prop
   pathRef.current = path;
   const vimComp = useRef(new Compartment());
   const liveComp = useRef(new Compartment());
+  const imagesExt = useRef(imagePreview(() => pathRef.current));
   const settings = getState().settings;
 
   useEffect(() => {
@@ -488,7 +490,7 @@ export default function Editor({ path, value, onChange, jumpLine, active }: Prop
       selection: { anchor: fm ? fm[0].length : 0 },
       extensions: [
         vimComp.current.of(settings?.vimMode ? vim() : []),
-        liveComp.current.of(settings?.livePreview === false ? [] : [livePreview, frontmatterField]),
+        liveComp.current.of(settings?.livePreview === false ? [] : [livePreview, frontmatterField, imagesExt.current]),
         history(),
         drawSelection(),
         closeBrackets(),
@@ -618,7 +620,7 @@ export default function Editor({ path, value, onChange, jumpLine, active }: Prop
   }, [settings?.vimMode]);
 
   useEffect(() => {
-    viewRef.current?.dispatch({ effects: liveComp.current.reconfigure(settings?.livePreview === false ? [] : [livePreview, frontmatterField]) });
+    viewRef.current?.dispatch({ effects: liveComp.current.reconfigure(settings?.livePreview === false ? [] : [livePreview, frontmatterField, imagesExt.current]) });
   }, [settings?.livePreview]);
 
   useEffect(() => {
@@ -652,19 +654,15 @@ function wrap(view: EditorView, mark: string): boolean {
   return true;
 }
 
-async function insertImages(view: EditorView, files: File[]): Promise<void> {
-  for (const file of files) {
-    try {
-      const data = new Uint8Array(await file.arrayBuffer());
-      const ext = file.type.split("/")[1]?.replace("jpeg", "jpg") ?? "png";
-      const name = file.name && file.name !== "image.png" ? file.name : `Obrázek ${new Date().toISOString().slice(0, 19).replace(/[T:]/g, "-")}.${ext}`;
-      const rel = await window.vimmi.vault.attachment(name, data);
-      const link = `![](${rel.split("/").map(encodeURIComponent).join("/")})`;
-      view.dispatch(view.state.replaceSelection(link));
-    } catch (err) {
-      toast(`Obrázek se nepodařilo vložit: ${String(err)}`, "error");
-    }
+/** Lets the user pick images (gallery or camera on phones) and inserts them into the active editor. */
+export async function insertPickedImages(path?: string): Promise<void> {
+  const ed = activeEditor;
+  if (!ed || (path && ed.path !== path)) {
+    toast("Nejdřív otevři poznámku v režimu úprav.", "error");
+    return;
   }
+  const files = await pickImages();
+  if (files.length) await insertImages(ed.view, files);
 }
 
 /** Inserts or replaces text in the active editor (used by AI actions). */

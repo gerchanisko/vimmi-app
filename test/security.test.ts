@@ -17,6 +17,12 @@ describe("security", () => {
     expect(renderMarkdown("![obrázek](https://example.com/a.png)")).toContain("<img");
   });
 
+  it("reads image width from the alt text", () => {
+    const html = renderMarkdown("![Graf|300](https://example.com/g.png)");
+    expect(html).toContain('width="300"');
+    expect(html).toContain('alt="Graf"');
+  });
+
   it("refuses paths outside the vault", () => {
     for (const p of ["../tajne.txt", "a/../../b", "..\\..\\Windows\\x", "C:/Windows/x"]) expect(() => cleanPath(p)).toThrow();
     expect(cleanPath("./Projekty//Web.md")).toBe("Projekty/Web.md");

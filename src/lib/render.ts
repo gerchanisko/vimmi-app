@@ -138,6 +138,14 @@ md.renderer.rules.image = (tokens, idx, opts, rawEnv, self) => {
     }
     token.attrSet("src", fileUrl(rel.replace(/^\/+/, "")));
   }
+  // Obsidian-style size: ![popis|300](obrazek.png)
+  const size = token.content.match(/^(.*?)\|(\d+)$/);
+  if (size) {
+    token.content = size[1];
+    const last = token.children?.[token.children.length - 1];
+    if (last?.type === "text") last.content = last.content.replace(/\|\d+$/, "");
+    token.attrSet("width", size[2]);
+  }
   return defaultImage(tokens, idx, opts, rawEnv, self);
 };
 

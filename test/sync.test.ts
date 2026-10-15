@@ -105,6 +105,26 @@ describe("sync", () => {
     expect(gh.ref).toBe(before);
   });
 
+  it("quick check costs one request when nothing changed and still notices new commits", async () => {
+    const pc = await device({ "A.md": "a", "Přílohy/foto.png": "\u0089PNG obrázek" });
+    await syncVault(pc.vault, cfg("pc"));
+    const phone = await device();
+    await syncVault(phone.vault, cfg("phone"));
+    expect(phone.vault.snapshot().files).toContain("Přílohy/foto.png");
+
+    const before = gh.requests;
+    const idle = await syncVault(phone.vault, cfg("phone"), { quick: true });
+    expect(idle.unchanged).toBe(true);
+    expect(gh.requests - before).toBe(1);
+
+    await pc.vault.write("A.md", "a z počítače");
+    await syncVault(pc.vault, cfg("pc"));
+    const r = await syncVault(phone.vault, cfg("phone"), { quick: true });
+    expect(r.unchanged).toBeFalsy();
+    expect(r.pulled).toEqual(["A.md"]);
+    expect(phone.vault.read("A.md")).toBe("a z počítače");
+  });
+
   it("carries edits and deletions both ways", async () => {
     const pc = await device({ "A.md": "a", "B.md": "b" });
     await syncVault(pc.vault, cfg("pc"));

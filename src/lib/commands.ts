@@ -14,6 +14,7 @@ import {
   toggleRight,
   trashPath,
 } from "./actions";
+import { insertPickedImages } from "../components/Editor";
 import { flushAll } from "./docs";
 import { activeNotePath, getState, openView, setState } from "./store";
 
@@ -40,6 +41,7 @@ export const COMMANDS: Command[] = [
   { id: "new-note", label: "Nová poznámka", icon: "pen", keys: "Mod+N", shortcut: "Ctrl+N", run: () => void newNote() },
   { id: "new-from-template", label: "Nová poznámka ze šablony", icon: "template", keys: "Mod+Shift+N", shortcut: "Ctrl+Shift+N", keywords: "šablona template", run: () => setState({ overlay: { type: "template" } }) },
   { id: "new-folder", label: "Nová složka", icon: "folder-plus", run: () => void newFolder("") },
+  { id: "insert-image", label: "Vložit obrázek", icon: "image", keywords: "image obrázek foto fotka příloha", run: () => void insertPickedImages() },
   { id: "daily", label: "Dnešní poznámka (deník)", icon: "calendar", keys: "Mod+D", shortcut: "Ctrl+D", keywords: "deník daily journal", run: () => void openDaily() },
   { id: "daily-yesterday", label: "Včerejší poznámka", icon: "calendar", run: () => void openDaily(-1) },
   { id: "daily-tomorrow", label: "Zítřejší poznámka", icon: "calendar", run: () => void openDaily(1) },

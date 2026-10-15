@@ -67,6 +67,7 @@ import {
   X,
   type LucideIcon,
   Bell,
+  ImagePlus,
   MapPin,
 } from "lucide-react";
 
@@ -139,6 +140,7 @@ const ICONS: Record<string, LucideIcon> = {
   trash: Trash2,
   close: X,
   bell: Bell,
+  image: ImagePlus,
   "map-pin": MapPin,
 };
 
