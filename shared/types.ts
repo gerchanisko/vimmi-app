@@ -148,7 +148,7 @@ export const DEFAULT_SETTINGS: Settings = {
   baseUrls: {},
   effort: "medium",
   quickEffort: "low",
-  approvalMode: "auto",
+  approvalMode: "ask",
   webSearch: false,
   showThinking: true,
   dailyFolder: "Deník",

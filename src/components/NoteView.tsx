@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { basename, dirname, isoDate } from "../../shared/markdown";
 import { askAi, renamePath, toggleBookmark, toggleMode, trashPath } from "../lib/actions";
 import { loadDoc, saveDoc, subscribeDoc, updateDoc } from "../lib/docs";
-import { renderNote } from "../lib/render";
+import { escapeHtml, renderNote } from "../lib/render";
 import { errorText, getState, openView, resolveLink, setState, toast, useApp } from "../lib/store";
 import { QUICK_ACTIONS, runQuick } from "./AiQuick";
 import Editor, { followLink, insertPickedImages } from "./Editor";
@@ -223,7 +223,7 @@ function Properties({ yaml }: { yaml: string }) {
 
 async function exportPdf(path: string, content: string) {
   const { html } = renderNote(content, { resolve: (t) => resolveLink(t, path) });
-  const page = `<!doctype html><html lang="cs"><head><meta charset="utf-8"><title>${basename(path)}</title>
+  const page = `<!doctype html><html lang="cs"><head><meta charset="utf-8"><title>${escapeHtml(basename(path))}</title>
 <style>
 body{font:15px/1.65 Inter,system-ui,sans-serif;color:#171717;max-width:720px;margin:0 auto;padding:24px}
 h1,h2,h3{line-height:1.25;margin:1.4em 0 .5em} h1{font-size:1.9em;margin-top:0}

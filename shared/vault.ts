@@ -20,6 +20,7 @@ import {
 } from "./markdown";
 import type { NoteMeta, Priority, SearchHit, Task, VaultSnapshot } from "./types";
 import { NoteHistory, type VersionSource } from "./history";
+import { newRemoteImages } from "./remote-images";
 
 export interface FileStat {
   mtime: number;
@@ -58,7 +59,8 @@ const FM_RE = /^---\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/;
 
 /** True for paths the vault ignores: hidden files/folders and tool folders. */
 export function isIgnoredPath(rel: string): boolean {
-  return rel.split("/").some((part) => part.startsWith(".") || IGNORED.has(part));
+  // "GIT~1" is the short Windows name of .git: writing there would land in the real .git folder.
+  return rel.split("/").some((part) => part.startsWith(".") || IGNORED.has(part) || /^git~\d+$/i.test(part));
 }
 
 export function isNotePath(rel: string): boolean {
@@ -378,7 +380,14 @@ export class Vault extends Emitter {
   // ---------- writing ----------
 
   private async writeNote(rel: string, content: string, source: VersionSource = this.actor): Promise<void> {
-    await this.keepVersion(rel, this.notes.get(rel)?.content, content, source);
+    const previous = this.notes.get(rel)?.content;
+    // Remote images load by themselves, so the AI could leak notes through their address.
+    if (source === "ai" && newRemoteImages(previous ?? "", content).length) {
+      throw new VaultError(
+        "AI nemůže do poznámek vkládat obrázky z internetu (načetly by se samy a mohly by vynést obsah poznámek). Napiš místo nich odkaz [popis](adresa) – obrázek může uživatel vložit sám.",
+      );
+    }
+    await this.keepVersion(rel, previous, content, source);
     const stat = await this.storage.writeText(rel, content);
     this.index(rel, content, stat);
     this.ensureFolders(rel);

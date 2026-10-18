@@ -2,12 +2,10 @@
 // or the gallery/camera, downscaled when they are huge, and opened full size on click.
 import { type EditorState, type Range, StateField } from "@codemirror/state";
 import { Decoration, type DecorationSet, EditorView, WidgetType } from "@codemirror/view";
+import { MD_IMAGE, WIKI_IMAGE } from "../../shared/remote-images";
 import { getState, toast } from "./store";
 
 export const IMAGE_EXT = /\.(png|jpe?g|gif|webp|svg|avif|bmp)$/i;
-
-const WIKI_IMAGE = /!\[\[([^\]|#\n]+?)(?:\|(\d+)(?:x\d+)?)?\]\]/g;
-const MD_IMAGE = /!\[([^\]\n]*)\]\(\s*<?([^)\s>]+)>?(?:\s+"[^"\n]*")?\s*\)/g;
 
 interface FoundImage {
   src: string;

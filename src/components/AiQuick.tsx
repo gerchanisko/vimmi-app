@@ -1,5 +1,6 @@
 // One-shot AI writing actions on the selection or the whole note, with a result preview.
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { newRemoteImages } from "../../shared/remote-images";
 import type { QuickAction } from "../../shared/types";
 import { renderMarkdown } from "../lib/render";
 import { activeNotePath, getState, setState, toast } from "../lib/store";
@@ -145,6 +146,12 @@ export function AiQuickPanel() {
   const apply = (mode: "replace" | "below") => {
     let text = q.text;
     if (q.action === "suggest_tags") text = text.trim();
+    // Same rule as AI edits in the vault: no new images from the internet (they would load by themselves).
+    const doc = getActiveEditor()?.view.state.doc.toString() ?? "";
+    if (newRemoteImages(doc, text).length) {
+      toast("Výsledek obsahuje obrázky z internetu, tak ho Vimmi nevloží. Zkopíruj si ho a zkontroluj.", "error");
+      return;
+    }
     if (!insertIntoEditor(text, mode)) {
       toast("Otevři poznámku v režimu úprav, kam se má text vložit.", "error");
       return;
