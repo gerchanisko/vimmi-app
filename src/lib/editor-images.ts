@@ -13,6 +13,20 @@ interface FoundImage {
   src: string;
   alt: string;
   width?: number;
+  /** The Markdown as written and where it starts in its line (for writing a new size back). */
+  raw: string;
+  index: number;
+}
+
+/** The same image link with a new width (undefined = original size), Obsidian style. */
+export function withWidth(raw: string, width: number | undefined): string {
+  const size = width ? `|${Math.round(width)}` : "";
+  const wiki = raw.match(/^!\[\[([^\]|#\n]+?)(?:\|\d+(?:x\d+)?)?\]\]$/);
+  if (wiki) return `![[${wiki[1]}${size}]]`;
+  const md = raw.match(/^!\[([^\]\n]*)\](\(.*\))$/);
+  if (!md) return raw;
+  const alt = md[1].replace(/\|\d+(?:x\d+)?$/, "");
+  return `![${alt}${size}]${md[2]}`;
 }
 
 function dirOf(path: string): string {
@@ -48,12 +62,18 @@ function imagesInLine(text: string, notePath: string | undefined): { images: Fou
   let rest = text;
   for (const m of text.matchAll(WIKI_IMAGE)) {
     if (!IMAGE_EXT.test(m[1].trim())) continue;
-    images.push({ src: imageSrc(m[1].trim(), notePath, true), alt: m[1].trim(), width: m[2] ? Number(m[2]) : undefined });
+    images.push({ src: imageSrc(m[1].trim(), notePath, true), alt: m[1].trim(), width: m[2] ? Number(m[2]) : undefined, raw: m[0], index: m.index! });
     rest = rest.replace(m[0], "");
   }
   for (const m of text.matchAll(MD_IMAGE)) {
     const [alt, size] = m[1].split("|");
-    images.push({ src: imageSrc(m[2], notePath, false), alt: alt.trim() || m[2], width: /^\d+$/.test(size ?? "") ? Number(size) : undefined });
+    images.push({
+      src: imageSrc(m[2], notePath, false),
+      alt: alt.trim() || m[2],
+      width: /^\d+$/.test(size ?? "") ? Number(size) : undefined,
+      raw: m[0],
+      index: m.index!,
+    });
     rest = rest.replace(m[0], "");
   }
   return { images, only: images.length > 0 && rest.trim() === "" };
@@ -91,7 +111,7 @@ class ImageWidget extends WidgetType {
           e.stopPropagation();
           openLightbox(img.src, img.alt);
         });
-        figure.append(el, zoom);
+        figure.append(el, zoom, resizeHandle(view, box, figure, el, img));
       } else {
         figure.append(missing(img.alt));
       }
@@ -99,7 +119,7 @@ class ImageWidget extends WidgetType {
     }
     // Clicking the picture puts the cursor on its line, which reveals the Markdown for editing.
     box.addEventListener("mousedown", (e) => {
-      if ((e.target as HTMLElement).closest(".cm-image-zoom")) return;
+      if ((e.target as HTMLElement).closest(".cm-image-zoom, .cm-image-resize")) return;
       e.preventDefault();
       const pos = view.posAtDOM(box);
       view.dispatch({ selection: { anchor: view.state.doc.lineAt(Math.min(pos, view.state.doc.length)).to } });
@@ -110,6 +130,62 @@ class ImageWidget extends WidgetType {
   ignoreEvent() {
     return true;
   }
+}
+
+/** Writes a new width into the image's Markdown (found again by its text, in case the line moved). */
+function setWidth(view: EditorView, box: HTMLElement, img: FoundImage, width: number | undefined): void {
+  const pos = Math.min(view.posAtDOM(box), view.state.doc.length);
+  const line = view.state.doc.lineAt(pos);
+  let at = line.text.slice(img.index, img.index + img.raw.length) === img.raw ? img.index : line.text.indexOf(img.raw);
+  if (at < 0) return;
+  const next = withWidth(img.raw, width);
+  if (next === img.raw) return;
+  at += line.from;
+  view.dispatch({ changes: { from: at, to: at + img.raw.length, insert: next } });
+}
+
+/** Corner handle: drag to resize (snaps to 10 px), double-click for the original size. */
+function resizeHandle(view: EditorView, box: HTMLElement, figure: HTMLElement, el: HTMLImageElement, img: FoundImage): HTMLElement {
+  const handle = document.createElement("span");
+  handle.className = "cm-image-resize";
+  handle.title = "Táhni pro změnu velikosti, dvojklik vrátí původní";
+  handle.setAttribute("role", "slider");
+  handle.setAttribute("aria-label", "Velikost obrázku");
+  const label = document.createElement("span");
+  label.className = "cm-image-size";
+  handle.addEventListener("pointerdown", (e) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    handle.setPointerCapture(e.pointerId);
+    const startX = e.clientX;
+    const startW = el.getBoundingClientRect().width;
+    const maxW = Math.max(60, box.clientWidth);
+    let width = startW;
+    figure.classList.add("resizing");
+    figure.append(label);
+    const move = (ev: PointerEvent) => {
+      width = Math.round(Math.min(maxW, Math.max(48, startW + ev.clientX - startX)) / 10) * 10;
+      el.style.width = `${width}px`;
+      label.textContent = width >= maxW - 10 ? "plná šířka" : `${width} px`;
+    };
+    const up = () => {
+      handle.removeEventListener("pointermove", move);
+      figure.classList.remove("resizing");
+      label.remove();
+      if (Math.abs(width - startW) < 4) return;
+      setWidth(view, box, img, width >= maxW - 10 ? undefined : width);
+    };
+    handle.addEventListener("pointermove", move);
+    handle.addEventListener("pointerup", up, { once: true });
+    handle.addEventListener("pointercancel", up, { once: true });
+  });
+  handle.addEventListener("dblclick", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setWidth(view, box, img, undefined);
+  });
+  return handle;
 }
 
 function missing(name: string): HTMLElement {

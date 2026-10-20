@@ -2420,6 +2420,47 @@ label.check {
     opacity: 1;
   }
 }
+.cm-image-resize {
+  position: absolute;
+  right: -4px;
+  bottom: -4px;
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  background: var(--accent);
+  border: 2px solid var(--surface);
+  cursor: nwse-resize;
+  touch-action: none;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.cm-image:hover .cm-image-resize,
+.cm-image.resizing .cm-image-resize {
+  opacity: 1;
+}
+@media (hover: none) {
+  .cm-image-resize {
+    opacity: 1;
+    width: 24px;
+    height: 24px;
+  }
+}
+.cm-image.resizing img {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.cm-image-size {
+  position: absolute;
+  left: 8px;
+  bottom: 8px;
+  line-height: 1;
+  font-size: 12px;
+  padding: 4px 7px;
+  border-radius: 5px;
+  background: rgb(0 0 0 / 0.65);
+  color: #fff;
+  pointer-events: none;
+}
 .cm-image-missing {
   display: inline-block;
   line-height: 1.4;

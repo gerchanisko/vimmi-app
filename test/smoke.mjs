@@ -332,6 +332,26 @@ try {
     const size = await img.evaluate((el) => (el.complete ? el.naturalWidth : new Promise((r) => (el.onload = () => r(el.naturalWidth)))));
     if (size !== 2400) throw new Error(`expected 2400 px wide, got ${size}`);
     await shot("22-image-editor");
+    // Resize by dragging the corner handle; the width goes into the link.
+    const figure = pane.locator(".cm-image").first();
+    await figure.hover();
+    const handle = figure.locator(".cm-image-resize");
+    const hb = await handle.boundingBox();
+    await page.mouse.move(hb.x + hb.width / 2, hb.y + hb.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(hb.x - 150, hb.y + 10, { steps: 6 });
+    await page.mouse.move(hb.x - 300, hb.y + 20, { steps: 6 });
+    await shot("22b-image-resizing");
+    await page.mouse.up();
+    for (let i = 0; i < 20 && !/!\[\|\d+\]\(Přílohy\/IMG_2041\.webp\)/u.test(read("Nápady.md")); i++) await page.waitForTimeout(200);
+    const sized = read("Nápady.md").match(/!\[\|(\d+)\]\(Přílohy\/IMG_2041\.webp\)/u);
+    if (!sized) throw new Error(`width not written:\n${read("Nápady.md")}`);
+    const shown = await pane.locator(".cm-image img").first().evaluate((el) => Math.round(el.getBoundingClientRect().width));
+    if (Math.abs(shown - Number(sized[1])) > 2) throw new Error(`shown ${shown}px, written ${sized[1]}`);
+    await pane.locator(".cm-image").first().hover();
+    await pane.locator(".cm-image-resize").first().dblclick();
+    for (let i = 0; i < 20 && /\|\d+\]\(Přílohy/u.test(read("Nápady.md")); i++) await page.waitForTimeout(200);
+    if (!read("Nápady.md").includes("![](Přílohy/IMG_2041.webp)")) throw new Error("double-click did not reset the size");
     await pane.locator(".cm-image-zoom").first().click({ force: true });
     await page.locator(".lightbox img").waitFor();
     await shot("23-image-lightbox");
