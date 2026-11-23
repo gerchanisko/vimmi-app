@@ -6,7 +6,7 @@ use std::collections::BTreeMap;
 use std::path::Path;
 use std::sync::OnceLock;
 
-const SERVICE: &str = "io.github.gerchanisko.vimmi.beta";
+const SERVICE: &str = "io.github.gerchanisko.vimmi";
 
 fn valid_id(id: &str) -> Result<(), String> {
     if !id.is_empty() && id.len() <= 40 && id.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_') {

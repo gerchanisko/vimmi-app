@@ -1,8 +1,10 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "What the Vimmi window may do: its own commands, folder dialogs, opening web links, notifications and HTTPS requests for AI, GitHub sync and calendars.",
-  "windows": ["main"],
+  "description": "What the Vimmi window may do: its own commands, folder dialogs, opening web links, notifications and HTTPS requests for AI, GitHub sync and calendars, and installing signed updates.",
+  "windows": [
+    "main"
+  ],
   "permissions": [
     "core:default",
     "core:window:allow-set-title",
@@ -11,12 +13,33 @@
     "opener:allow-reveal-item-in-dir",
     {
       "identifier": "opener:allow-open-url",
-      "allow": [{ "url": "https://*" }, { "url": "http://*" }, { "url": "mailto:*" }]
+      "allow": [
+        {
+          "url": "https://*"
+        },
+        {
+          "url": "http://*"
+        },
+        {
+          "url": "mailto:*"
+        }
+      ]
     },
     "notification:default",
     {
       "identifier": "http:default",
-      "allow": [{ "url": "https://*" }, { "url": "http://localhost:*" }, { "url": "http://127.0.0.1:*" }]
-    }
+      "allow": [
+        {
+          "url": "https://*"
+        },
+        {
+          "url": "http://localhost:*"
+        },
+        {
+          "url": "http://127.0.0.1:*"
+        }
+      ]
+    },
+    "process:allow-restart"
   ]
 }

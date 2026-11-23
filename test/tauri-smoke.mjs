@@ -1,7 +1,8 @@
 // End-to-end test of the Rust desktop app (Tauri beta) through WebDriver (tauri-driver + WebKitWebDriver):
 // a temporary vault and settings, a mock AI server, a fake GitHub; clicks through the main features.
 // Usage: npx tauri build --debug --no-bundle && node scripts/build-electron.mjs && node test/tauri-smoke.mjs [binary]
-import { spawn } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
+import http from "node:http";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -9,11 +10,14 @@ import { apiUrl, chatRequests, server } from "./mock-ai.mjs";
 import { FakeGitHub, serveFakeGitHub } from "../dist-electron/fake-github-for-test.mjs";
 import { sampleNotes } from "../dist-electron/sample-for-test.cjs";
 
-const binary = path.resolve(process.argv[2] ?? "src-tauri/target/debug/vimmi-beta");
+const binary = path.resolve(process.argv[2] ?? "src-tauri/target/debug/vimmi");
 const shots = path.resolve("test/screenshots-tauri");
 fs.mkdirSync(shots, { recursive: true });
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "vimmi-tauri-"));
 const userData = path.join(tmp, "user-data");
+// The Electron app's settings folder (Vimmi 0.7): the first start after the update takes them over.
+const electronData = path.join(tmp, "electron-user-data");
+fs.mkdirSync(electronData, { recursive: true });
 const vaultDir = path.join(tmp, "Trezor");
 fs.mkdirSync(userData, { recursive: true });
 for (const [rel, content] of Object.entries(sampleNotes(new Date().toISOString().slice(0, 10)))) {
@@ -25,7 +29,7 @@ const read = (rel) => fs.readFileSync(path.join(vaultDir, rel), "utf8");
 const gh = new FakeGitHub();
 const ghApi = await serveFakeGitHub(gh);
 fs.writeFileSync(
-  path.join(userData, "settings.json"),
+  path.join(electronData, "settings.json"),
   JSON.stringify({
     vaultPath: vaultDir,
     recentVaults: [vaultDir],
@@ -37,11 +41,63 @@ fs.writeFileSync(
     sync: { enabled: true, owner: "me", repo: "notes" },
   }),
 );
+// Keys as Electron saved them: "plain:" (no keyring) and v10 (Chromium's fixed Linux password).
+{
+  const { createCipheriv, pbkdf2Sync } = await import("node:crypto");
+  const key = pbkdf2Sync("peanuts", "saltysalt", 1, 16, "sha1");
+  const c = createCipheriv("aes-128-cbc", key, Buffer.alloc(16, " "));
+  const v10 = Buffer.concat([Buffer.from("v10"), c.update("sk-or-v1-from-electron"), c.final()]);
+  fs.writeFileSync(
+    path.join(electronData, "api-keys.json"),
+    JSON.stringify({ gemini: Buffer.from("plain:AIza-from-electron").toString("base64"), openrouter: v10.toString("base64") }),
+  );
+}
+
+// ---------- signed updates (Vimmi 0.8+): a test key, a signed "new version", a feed ----------
+// The "AppImage" is a small real program (the updater only installs executables); the installed
+// one is another program, so a replaced file is easy to tell.
+const upd = path.join(tmp, "update");
+fs.mkdirSync(upd);
+execFileSync("npx", ["tauri", "signer", "generate", "--ci", "-p", "", "-w", path.join(upd, "test.key")], { stdio: "ignore" });
+const payload = path.join(upd, "Vimmi.AppImage");
+fs.copyFileSync("/usr/bin/true", payload);
+execFileSync("npx", ["tauri", "signer", "sign", "-f", path.join(upd, "test.key"), "-p", "", payload], { stdio: "ignore" });
+const installedExe = path.join(upd, "installed", "Vimmi.AppImage");
+fs.mkdirSync(path.dirname(installedExe));
+fs.copyFileSync("/usr/bin/false", installedExe);
+let serveTampered = true;
+const feed = http.createServer((req, res) => {
+  const base = `http://127.0.0.1:${feed.address().port}`;
+  if (req.url === "/latest.json") {
+    res.writeHead(200, { "content-type": "application/json" });
+    res.end(JSON.stringify({ version: "9.9.9", notes: "", pub_date: new Date().toISOString(), platforms: { "linux-x86_64": { signature: fs.readFileSync(`${payload}.sig`, "utf8"), url: `${base}/Vimmi.AppImage` } } }));
+    return;
+  }
+  // A changed file under the same signature must be refused.
+  const body = fs.readFileSync(payload);
+  res.writeHead(200, { "content-type": "application/octet-stream" });
+  res.end(serveTampered ? Buffer.concat([body, Buffer.from("x")]) : body);
+});
+await new Promise((r) => feed.listen(0, "127.0.0.1", r));
 
 // ---------- tiny WebDriver client ----------
 const port = 4444 + Math.floor(Math.random() * 500);
 const driver = spawn(path.join(os.homedir(), ".cargo/bin/tauri-driver"), ["--port", String(port)], {
-  env: { ...process.env, VIMMI_USER_DATA: userData, VIMMI_NO_KEYRING: "1", VIMMI_GITHUB_TOKEN: "t", VIMMI_GITHUB_API: ghApi.url },
+  env: {
+    ...process.env,
+    VIMMI_USER_DATA: userData,
+    VIMMI_ELECTRON_DIR: electronData,
+    VIMMI_NO_KEYRING: "1",
+    VIMMI_GITHUB_TOKEN: "t",
+    VIMMI_GITHUB_API: ghApi.url,
+    // Updates: pretend to be an install.sh install, with a fake release feed and installer.
+    VIMMI_UPDATE_METHOD: "script",
+    VIMMI_UPDATE_FEED: `${apiUrl}/release/latest`,
+    VIMMI_UPDATE_COMMAND: "echo instaluji; sleep 1",
+    VIMMI_UPDATE_ENDPOINT: `http://127.0.0.1:${feed.address().port}/latest.json`,
+    VIMMI_UPDATE_PUBKEY: fs.readFileSync(path.join(upd, "test.key.pub"), "utf8").trim(),
+    VIMMI_UPDATE_EXE: installedExe,
+  },
   stdio: ["ignore", "ignore", "pipe"],
 });
 let driverLog = "";
@@ -133,9 +189,19 @@ try {
     const info = await js("return { kind: window.vimmi.app.kind, platform: window.vimmi.app.platform, title: document.title }");
     if (info.kind !== "desktop" || info.platform !== "linux") throw new Error(JSON.stringify(info));
     const version = await apiOk("return window.vimmi.app.version()");
-    if (!/beta/.test(version)) throw new Error(`version ${version}`);
+    if (version !== JSON.parse(fs.readFileSync("package.json", "utf8")).version) throw new Error(`version ${version}`);
     await sleep(400);
     await shot("01-welcome");
+  });
+
+  await step("first start after the Electron app: settings and keys are taken over", async () => {
+    const saved = JSON.parse(fs.readFileSync(path.join(userData, "settings.json"), "utf8"));
+    if (saved.vaultPath !== vaultDir || saved.provider !== "custom") throw new Error("settings not imported");
+    const keys = JSON.parse(fs.readFileSync(path.join(userData, "secrets.json"), "utf8"));
+    if (keys.gemini !== "AIza-from-electron") throw new Error("plain key not imported");
+    if (keys.openrouter !== "sk-or-v1-from-electron") throw new Error("encrypted key not imported");
+    const s = await apiOk("return window.vimmi.settings.get()");
+    if (!s.keys.gemini || !s.keys.openrouter) throw new Error("imported keys not reported");
   });
 
   await step("editing autosaves to disk (through Rust)", async () => {
@@ -261,15 +327,15 @@ try {
   });
 
   await step("AI keys: saved privately, never in the vault or settings", async () => {
-    await apiOk(`await window.vimmi.settings.setKey("gemini", "AIza-test-key")`);
+    await apiOk(`await window.vimmi.settings.setKey("anthropic", "sk-ant-test-key")`);
     const s = await apiOk(`return window.vimmi.settings.get()`);
-    if (!s.keys.gemini) throw new Error("key not reported");
+    if (!s.keys.anthropic) throw new Error("key not reported");
     const stored = JSON.parse(fs.readFileSync(path.join(userData, "secrets.json"), "utf8"));
-    if (stored.gemini !== "AIza-test-key") throw new Error("key not stored");
+    if (stored.anthropic !== "sk-ant-test-key") throw new Error("key not stored");
     if ((fs.statSync(path.join(userData, "secrets.json")).mode & 0o777) !== 0o600) throw new Error("key file readable by others");
-    if (fs.readFileSync(path.join(userData, "settings.json"), "utf8").includes("AIza")) throw new Error("key in settings.json");
-    await apiOk(`await window.vimmi.settings.setKey("gemini", null)`);
-    if (fs.existsSync(path.join(userData, "secrets.json")) && JSON.parse(fs.readFileSync(path.join(userData, "secrets.json"), "utf8")).gemini) throw new Error("key not removed");
+    if (/sk-ant|AIza/.test(fs.readFileSync(path.join(userData, "settings.json"), "utf8"))) throw new Error("key in settings.json");
+    await apiOk(`await window.vimmi.settings.setKey("anthropic", null)`);
+    if (JSON.parse(fs.readFileSync(path.join(userData, "secrets.json"), "utf8")).anthropic) throw new Error("key not removed");
   });
 
   await step("GitHub sync: uploads the vault and brings a change from another device", async () => {
@@ -283,6 +349,27 @@ try {
   await step("phone calendar: a secret gist is created", async () => {
     const st = await apiOk("return window.vimmi.calendar.feedEnable()");
     if (gh.gists.size !== 1 || [...gh.gists.values()][0].public) throw new Error(`secret gist not created: ${JSON.stringify(st)}`);
+  });
+
+  await step("finds a new version, installs it (install.sh) and offers a restart", async () => {
+    const st = await apiOk("return window.vimmi.update.check()");
+    if (st.method !== "script") throw new Error(`method ${st.method}`);
+    await until("update installed", async () => (await apiOk("return window.vimmi.update.status()")).state === "ready", 20000);
+    const done = await apiOk("return window.vimmi.update.status()");
+    if (done.version !== "9.9.9") throw new Error(`version ${done.version}`);
+  });
+
+  await step("signed updates: a changed file is refused, the signed one is installed", async () => {
+    const call = (cmd) =>
+      api(`const t = window.__TAURI_INTERNALS__; const ch = "__CHANNEL__:" + t.transformCallback(() => {}); return t.invoke(arguments[0], { onProgress: ch });`, cmd);
+    if ((await apiOk("return window.__TAURI_INTERNALS__.invoke('updater_check')")) !== "9.9.9") throw new Error("update not found");
+    const bad = await call("updater_download");
+    if (!bad || !bad.__error) throw new Error("a changed update file was accepted");
+    serveTampered = false;
+    const ok = await call("updater_download");
+    if (ok && ok.__error) throw new Error(`download failed: ${ok.__error}`);
+    await apiOk("return window.__TAURI_INTERNALS__.invoke('updater_install')");
+    if (!fs.readFileSync(installedExe).equals(fs.readFileSync(payload))) throw new Error("the update was not installed");
   });
 
   await step("settings persist on disk and dark theme switches", async () => {
@@ -304,10 +391,14 @@ try {
   console.log("FAILED");
   console.error(err);
   await shot("failure").catch(() => {});
+  console.error("user data:", fs.existsSync(userData) ? fs.readdirSync(userData) : "missing");
+  console.error("settings:", JSON.stringify(await api("const s = await window.vimmi.settings.get(); return { vaultPath: s.vaultPath, provider: s.provider }").catch((e) => String(e))));
+  console.error("stored:", JSON.stringify(await api("return window.__TAURI_INTERNALS__.invoke('settings_read')").catch((e) => String(e))));
 } finally {
   await wd("DELETE", `/session/${sid}`).catch(() => {});
   driver.kill();
   server.close();
+  feed.close();
   ghApi.close();
   fs.rmSync(tmp, { recursive: true, force: true });
 }

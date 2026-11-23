@@ -1,11 +1,27 @@
+const REPO = "gerchanisko/vimmi-app";
+const CHECK_EVERY_MS = 6 * 60 * 60 * 1000;
+const FIRST_CHECK_MS = 15_000;
+
+/** Compares dotted versions: 1 if a > b, -1 if a < b, 0 if equal. */
+export function compareVersions(a: string, b: string): number {
+  const pa = a.replace(/^v/, "").split(/[.-]/).map((x) => Number.parseInt(x, 10) || 0);
+  const pb = b.replace(/^v/, "").split(/[.-]/).map((x) => Number.parseInt(x, 10) || 0);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const d = (pa[i] ?? 0) - (pb[i] ?? 0);
+    if (d) return d > 0 ? 1 : -1;
+  }
+  return 0;
+}
+
 // The Rust desktop app's backend: the same window.vimmi API as the Electron preload, built from the
 // shared core (shared/) on top of the Rust side (src-tauri): files on disk, keyring, dialogs.
-import { invoke } from "@tauri-apps/api/core";
+import { Channel, invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { openUrl, revealItemInDir } from "@tauri-apps/plugin-opener";
 import { fetch as tauriFetch } from "@tauri-apps/plugin-http";
 import { isPermissionGranted, requestPermission, sendNotification } from "@tauri-apps/plugin-notification";
+import { relaunch } from "@tauri-apps/plugin-process";
 import type { VimmiApi } from "../electron/preload";
 import { sampleNotes } from "../electron/sample";
 import { Agent, friendlyError } from "../shared/ai/agent";
@@ -26,6 +42,7 @@ interface EnvInfo {
   hostname: string;
   version: string;
   github_api: string | null;
+  update_feed: string | null;
   documents: string | null;
   env_keys: Record<string, string>;
 }
@@ -105,6 +122,11 @@ export async function installBackend(): Promise<void> {
 
   // ---------- secrets (system keyring) ----------
 
+  // First start after the update from the Electron app: its settings come with settings_read,
+  // its saved keys are moved into the keyring here (nobody has to enter them again).
+  const stored = await invoke<{ json: string | null; imported: boolean }>("settings_read");
+  if (stored.imported) await invoke<string[]>("import_electron_keys").catch(() => []);
+
   const secrets = new Map<string, string>();
   for (const id of [...PROVIDERS.map((p) => p.id), "github"]) {
     const v = await invoke<string | null>("secret_get", { id }).catch(() => null);
@@ -131,7 +153,6 @@ export async function installBackend(): Promise<void> {
     const { hasApiKey: _h, keys: _k, hasSyncToken: _t, ...persist } = settings;
     return invoke("settings_write", { json: JSON.stringify(persist, null, 2) });
   };
-  const stored = await invoke<{ json: string | null; imported: boolean }>("settings_read");
   try {
     const parsed = JSON.parse(stored.json ?? "{}") as Partial<Settings> & { model?: string };
     const { model: legacyModel, ...rest } = parsed;
@@ -204,7 +225,7 @@ export async function installBackend(): Promise<void> {
     v.on("note-changed", (info) => bus.emit("vault:note-changed", info));
     vault = v;
     saveSettings({ vaultPath: v.root, recentVaults: [v.root, ...settings.recentVaults.filter((r) => r !== v.root)].slice(0, 8) });
-    void win.setTitle(`${storage.name} – Vimmi Beta`);
+    void win.setTitle(`${storage.name} – Vimmi`);
     sync.restart();
     calendars.start();
     feed.start();
@@ -227,9 +248,74 @@ export async function installBackend(): Promise<void> {
     }
   }
 
-  // ---------- updates: the beta is installed by hand for now ----------
+  // ---------- updates ----------
+  // auto: signed updates from GitHub Releases (Windows installer, AppImage), checked and installed in Rust;
+  // script: Linux install.sh installs run the installer of the new release; none: development builds.
 
-  const update: UpdateStatus = { state: "idle", method: "none", current: env.version };
+  const method = await invoke<UpdateStatus["method"]>("update_method");
+  let update: UpdateStatus = { state: "idle", method, current: env.version };
+  const setUpdate = (patch: Partial<UpdateStatus>) => {
+    update = { ...update, ...patch };
+    bus.emit("update:status", update);
+  };
+  let found = false;
+  const fail = (err: unknown) => setUpdate({ state: "error", message: err instanceof Error ? err.message : String(err) });
+
+  const download = async () => {
+    if (!found || update.state === "downloading") return;
+    setUpdate({ state: "downloading", progress: 0 });
+    const onProgress = new Channel<number>();
+    onProgress.onmessage = (progress) => setUpdate({ progress });
+    // Rust checks the signature against Vimmi's public key; an unsigned or changed file is refused.
+    await invoke("updater_download", { onProgress });
+    setUpdate({ state: "ready", progress: 100 });
+  };
+  const installWithScript = async () => {
+    if (update.state === "installing" || !update.version) return;
+    setUpdate({ state: "installing", message: undefined });
+    try {
+      await invoke("run_install_script", { version: update.version });
+      setUpdate({ state: "ready" });
+    } catch (err) {
+      fail(err);
+    }
+  };
+  const checkUpdate = async (): Promise<UpdateStatus> => {
+    if (method === "none") {
+      setUpdate({ state: "latest", message: "Vývojová verze se neaktualizuje." });
+      return update;
+    }
+    if (["downloading", "installing", "ready"].includes(update.state)) return update;
+    setUpdate({ state: "checking", message: undefined });
+    try {
+      if (method === "auto") {
+        const version = await invoke<string | null>("updater_check");
+        found = Boolean(version);
+        if (!version) setUpdate({ state: "latest", lastCheck: Date.now() });
+        else {
+          setUpdate({ state: "available", version, lastCheck: Date.now() });
+          if (settings.autoUpdate) void download().catch(fail);
+        }
+        return update;
+      }
+      const feed = env.update_feed ?? `https://api.github.com/repos/${REPO}/releases/latest`;
+      const res = await fetch(feed, { headers: { Accept: "application/vnd.github+json" } });
+      if (!res.ok) throw new Error(`GitHub odpověděl ${res.status}`);
+      const latest = ((await res.json()) as { tag_name: string }).tag_name.replace(/^v/, "");
+      if (compareVersions(latest, env.version) <= 0) setUpdate({ state: "latest", version: latest, lastCheck: Date.now() });
+      else {
+        setUpdate({ state: "available", version: latest, lastCheck: Date.now() });
+        if (settings.autoUpdate) void installWithScript();
+      }
+    } catch (err) {
+      fail(err);
+    }
+    return update;
+  };
+  if (method !== "none") {
+    setTimeout(() => settings.autoUpdate && void checkUpdate(), FIRST_CHECK_MS);
+    setInterval(() => settings.autoUpdate && void checkUpdate(), CHECK_EVERY_MS);
+  }
 
   const on = <T>(event: string, cb: (payload: T) => void) => bus.on<T>(event, cb);
   const wrap = <T>(fn: () => T | Promise<T>): Promise<T> => Promise.resolve().then(fn);
@@ -287,7 +373,7 @@ export async function installBackend(): Promise<void> {
           storage = undefined;
           await invoke("vault_close");
           saveSettings({ vaultPath: undefined });
-          void win.setTitle("Vimmi Beta");
+          void win.setTitle("Vimmi");
         }),
       snapshot: () => wrap(() => vault?.snapshot() ?? null),
       read: (p) => wrap(() => requireVault().read(p)),
@@ -367,9 +453,22 @@ export async function installBackend(): Promise<void> {
     },
     update: {
       status: () => wrap(() => update),
-      check: () => wrap(() => update),
-      install: () => wrap(() => undefined),
-      restart: () => wrap(() => location.reload()),
+      check: () => checkUpdate(),
+      install: () =>
+        wrap(async () => {
+          if (method === "script" && update.state === "available") await installWithScript();
+          if (method === "auto") {
+            if (!found) await checkUpdate();
+            await download().catch(fail);
+          }
+        }),
+      restart: () =>
+        wrap(async () => {
+          if (update.state !== "ready") return;
+          // Windows: the installer takes over and starts the new version; AppImage: the file is replaced.
+          if (method === "auto") await invoke("updater_install");
+          await relaunch();
+        }),
       onStatus: (cb) => on("update:status", cb),
     },
     ai: {

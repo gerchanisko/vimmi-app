@@ -1,4 +1,4 @@
-// Entry point of the Rust desktop app (Tauri beta): installs the backend, then starts the same UI.
+// Entry point of the desktop app (Rust/Tauri): installs the backend, then starts the same UI.
 import { installBackend } from "./backend";
 import "../src/styles.css";
 

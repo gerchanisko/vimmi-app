@@ -1,5 +1,8 @@
-# Tests Vimmi on Linux and Windows, then builds the Windows installer and the Linux AppImage
-# and attaches them to a GitHub Release named after the version in package.json.
+# Tests Vimmi, builds the desktop app (Rust/Tauri) for Windows and Linux and publishes a GitHub
+# Release named after the version in package.json, with the update feeds:
+# - latest.json            the app's own signed updates (Tauri updater), 0.8.0 and newer
+# - latest.yml / -linux    electron-updater feeds, so Vimmi 0.7 (Electron) updates itself to this version
+# - SHA256SUMS             checked by install.sh (Linux installs and their updates)
 name: Build and release
 
 on:
@@ -8,7 +11,7 @@ on:
   workflow_dispatch:
   pull_request:
 
-# Least privilege: jobs get only read access unless they need more (see the release job).
+# Least privilege: jobs get only read access unless they need more (see the publish job).
 permissions:
   contents: read
 
@@ -30,12 +33,7 @@ jobs:
       - run: npm test
       - run: npm run build
       - run: npm run build:web
-      - name: Smoke test (Windows)
-        if: runner.os == 'Windows'
-        run: node test/smoke.mjs test/screenshots
-      - name: Smoke test (Linux)
-        if: runner.os == 'Linux'
-        run: xvfb-run -a node test/smoke.mjs test/screenshots
+      # Desktop (shared core) and phone (web app) syncing through a fake GitHub.
       - name: Sync end-to-end test (Windows)
         if: runner.os == 'Windows'
         run: node test/sync-e2e.mjs test/screenshots
@@ -46,26 +44,53 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: smoke-screenshots-${{ matrix.os }}
+          name: sync-screenshots-${{ matrix.os }}
           path: test/screenshots
           if-no-files-found: ignore
 
-  release:
-    name: Release (${{ matrix.os }})
+  test-desktop:
+    name: Test desktop app (Linux)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: System libraries
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libwebkit2gtk-4.1-dev librsvg2-dev libsoup-3.0-dev webkit2gtk-driver xvfb dbus-x11
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - run: cargo install tauri-driver --locked
+      - run: npm ci
+      - run: cargo test --manifest-path src-tauri/Cargo.toml
+      - run: npx tauri build --debug --no-bundle
+      - run: node scripts/build-electron.mjs
+      - name: End-to-end test of the desktop app
+        run: xvfb-run -a node test/tauri-smoke.mjs
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-screenshots
+          path: test/screenshots-tauri
+          if-no-files-found: ignore
+
+  build:
+    name: Build (${{ matrix.os }})
     if: github.event_name != 'pull_request'
-    needs: test
-    permissions:
-      contents: write
+    needs: [test, test-desktop]
     strategy:
       matrix:
         include:
-          # latest*.yml tells installed apps (electron-updater) that a new version exists.
           - os: windows-latest
-            build: npx electron-builder --win nsis --publish never
-            files: release/Vimmi-Setup.exe release/Vimmi-Setup.exe.blockmap release/latest.yml
-          - os: ubuntu-latest
-            build: npx electron-builder --linux AppImage --publish never
-            files: release/Vimmi.AppImage release/latest-linux.yml
+            bundle: nsis
+          - os: ubuntu-22.04
+            bundle: appimage
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -73,23 +98,94 @@ jobs:
         with:
           node-version: 24
           cache: npm
+      - name: System libraries
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libwebkit2gtk-4.1-dev librsvg2-dev libsoup-3.0-dev libfuse2
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
       - run: npm ci
-      - run: npm run build
-      - run: ${{ matrix.build }}
-      - name: Publish to GitHub Release
+      - name: Build
         shell: bash
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: npx tauri build --bundles ${{ matrix.bundle }}
+      - name: Collect files under their download names
+        shell: bash
+        run: |
+          mkdir -p out
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            exe="$(ls src-tauri/target/release/bundle/nsis/*-setup.exe)"
+            cp "$exe" out/Vimmi-Setup.exe
+            cp "$exe.sig" out/Vimmi-Setup.exe.sig
+          else
+            img="$(ls src-tauri/target/release/bundle/appimage/*.AppImage)"
+            cp "$img" out/Vimmi.AppImage
+            cp "$img.sig" out/Vimmi.AppImage.sig
+          fi
+          ls -la out
+      # Vimmi 0.7 users get this installer from electron-updater: install 0.7.3 (Electron), then run
+      # the new installer the way electron-updater does, and check the old app is gone and the new one runs.
+      - name: Update from Vimmi 0.7 (Electron) on Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          gh release download v0.7.3 --repo $env:GITHUB_REPOSITORY --pattern Vimmi-Setup.exe --dir old
+          (Start-Process old\Vimmi-Setup.exe -ArgumentList "/S","/currentuser" -PassThru).WaitForExit()
+          $key = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\750d9110-42f7-5bf9-afcf-8d3ea3b5eaae"
+          $oldDir = (Get-ItemProperty "HKCU:\Software\750d9110-42f7-5bf9-afcf-8d3ea3b5eaae").InstallLocation
+          if (-not (Test-Path "$oldDir\Vimmi.exe")) { throw "Vimmi 0.7.3 did not install" }
+          # Only the installer is awaited: it starts the new app, which keeps running.
+          (Start-Process out\Vimmi-Setup.exe -ArgumentList "--updated","/S","--force-run" -PassThru).WaitForExit()
+          Start-Sleep -Seconds 5
+          if (Test-Path $key) { throw "the old app's uninstall entry is still there" }
+          if (Test-Path "$oldDir\Vimmi.exe") { throw "the old app is still installed" }
+          $new = "$env:LOCALAPPDATA\Vimmi\vimmi.exe"
+          if (-not (Test-Path $new)) { throw "the new app is not installed at $new" }
+          if (-not (Get-Process vimmi -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $new })) { throw "the new app did not start" }
+          Get-ChildItem "$env:APPDATA\Microsoft\Windows\Start Menu\Programs" -Recurse -Filter "Vimmi*.lnk" | ForEach-Object { $_.FullName }
+          if (-not (Get-ChildItem "$env:APPDATA\Microsoft\Windows\Start Menu\Programs" -Recurse -Filter "Vimmi.lnk")) { throw "no Start menu shortcut" }
+          Stop-Process -Name vimmi -Force
+          Write-Output "Update from 0.7.3 works."
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: app-${{ runner.os }}
+          path: out/*
+
+  publish:
+    name: Publish the release
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: out
+          merge-multiple: true
+      - name: Update feeds and checksums
+        run: node scripts/release-feeds.mjs out
+      - name: Publish to GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           tag="v$(node -p "require('./package.json').version")"
-          gh release view "$tag" >/dev/null 2>&1 || gh release create "$tag" --title "Vimmi $tag" --notes-file .github/release-notes.md || true
-          gh release upload "$tag" ${{ matrix.files }} --clobber
+          gh release view "$tag" >/dev/null 2>&1 || gh release create "$tag" --title "Vimmi $tag" --notes-file .github/release-notes.md
+          gh release upload "$tag" out/* --clobber
 
   # The web app (phones) is deployed together with the desktop release, from the same commit.
   web:
     name: Web app
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
-    needs: release
+    needs: publish
     permissions:
       contents: read
       pages: write

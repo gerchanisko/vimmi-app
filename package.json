@@ -1,7 +1,7 @@
 {
   "name": "vimmi",
   "productName": "Vimmi",
-  "version": "0.7.3",
+  "version": "0.8.0",
   "license": "GPL-3.0-or-later",
   "description": "Poznámky, úkoly a projekty na jednom klidném místě – s AI asistentem Claude.",
   "author": "gerchanisko",
@@ -24,8 +24,9 @@
     "build:tauri-web": "tsc --noEmit -p . && vite build --config vite.tauri.config.mts",
     "dev:tauri-web": "vite --config vite.tauri.config.mts",
     "tauri": "tauri",
-    "beta:build": "tauri build --no-bundle",
-    "beta:dev": "tauri dev"
+    "desktop:dev": "tauri dev",
+    "desktop:build": "tauri build",
+    "desktop:test": "tauri build --debug --no-bundle && node scripts/build-electron.mjs && node test/tauri-smoke.mjs"
   },
   "build": {
     "appId": "io.github.gerchanisko.vimmi",
@@ -95,6 +96,7 @@
     "@tauri-apps/plugin-http": "^2.9.0",
     "@tauri-apps/plugin-notification": "^2.8.1",
     "@tauri-apps/plugin-opener": "^2.7.3",
+    "@tauri-apps/plugin-process": "^2.4.0",
     "electron-updater": "^6.8.9",
     "js-yaml": "^5.4.3",
     "markdown-it": "^15.0.2",
