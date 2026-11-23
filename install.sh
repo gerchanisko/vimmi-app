@@ -71,7 +71,8 @@ if [ -n "$LOCAL_RELEASE" ]; then
   info "Z místní složky $LOCAL_RELEASE"
 else
   if [ -n "$TAG" ]; then base="https://github.com/$REPO/releases/download/$TAG"; else base="https://github.com/$REPO/releases/latest/download"; fi
-  curl -fL --progress-bar "$base/Vimmi.AppImage" -o "$tmp/Vimmi.AppImage" || die "Nepodařilo se stáhnout Vimmi ($base)."
+  progress="-s"; [ -t 2 ] && progress="--progress-bar"
+  curl -fL "$progress" "$base/Vimmi.AppImage" -o "$tmp/Vimmi.AppImage" || die "Nepodařilo se stáhnout Vimmi ($base)."
   curl -fsSL "$base/SHA256SUMS" -o "$tmp/SHA256SUMS" || die "Nepodařilo se stáhnout kontrolní součty."
 fi
 (cd "$tmp" && grep ' Vimmi.AppImage$' SHA256SUMS | sha256sum -c --quiet -) || die "Kontrolní součet nesouhlasí – stažený soubor je poškozený."
