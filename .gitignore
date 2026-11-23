@@ -4,3 +4,7 @@ dist-electron/
 release/
 test/screenshots/
 dist-web/
+dist-tauri/
+src-tauri/target/
+src-tauri/gen/
+test/screenshots-tauri/

@@ -1,7 +1,7 @@
 {
   "name": "vimmi",
   "productName": "Vimmi",
-  "version": "0.7.3",
+  "version": "0.8.0",
   "license": "GPL-3.0-or-later",
   "description": "Poznámky, úkoly a projekty na jednom klidném místě – s AI asistentem Claude.",
   "author": "gerchanisko",
@@ -20,7 +20,13 @@
     "dist:linux": "npm run build && electron-builder --linux AppImage --publish never",
     "build:web": "tsc --noEmit -p . && vite build --config vite.web.config.mts",
     "dev:web": "vite --config vite.web.config.mts",
-    "sync-e2e": "npm run build && npm run build:web && node test/sync-e2e.mjs"
+    "sync-e2e": "npm run build && npm run build:web && node test/sync-e2e.mjs",
+    "build:tauri-web": "tsc --noEmit -p . && vite build --config vite.tauri.config.mts",
+    "dev:tauri-web": "vite --config vite.tauri.config.mts",
+    "tauri": "tauri",
+    "desktop:dev": "tauri dev",
+    "desktop:build": "tauri build",
+    "desktop:test": "tauri build --debug --no-bundle && node scripts/build-electron.mjs && node test/tauri-smoke.mjs"
   },
   "build": {
     "appId": "io.github.gerchanisko.vimmi",
@@ -85,6 +91,12 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.133.0",
+    "@tauri-apps/api": "^2.12.5",
+    "@tauri-apps/plugin-dialog": "^2.8.4",
+    "@tauri-apps/plugin-http": "^2.9.0",
+    "@tauri-apps/plugin-notification": "^2.8.1",
+    "@tauri-apps/plugin-opener": "^2.7.3",
+    "@tauri-apps/plugin-process": "^2.4.0",
     "electron-updater": "^6.8.9",
     "js-yaml": "^5.4.3",
     "markdown-it": "^15.0.2",
@@ -103,6 +115,7 @@
     "@codemirror/view": "^6.43.14",
     "@lezer/highlight": "^1.2.5",
     "@replit/codemirror-vim": "^6.4.0",
+    "@tauri-apps/cli": "^2.12.6",
     "@types/d3-force": "^3.0.10",
     "@types/node": "^26.6.5",
     "@types/react": "^19.3.0",

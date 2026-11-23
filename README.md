@@ -23,17 +23,10 @@ Stačí jeden příkaz v terminálu:
 curl -fsSL https://raw.githubusercontent.com/gerchanisko/vimmi-app/main/install.sh | bash
 ```
 
-Skript si sám:
-- doinstaluje chybějící nástroje (`git`, `curl`…) přes správce balíčků tvé distribuce (apt, pacman, dnf, zypper),
-- použije systémový Node.js 22+, nebo stáhne oficiální Node.js jen pro Vimmi (do systému nezasahuje),
-- stáhne zdrojáky, sestaví aplikaci a přidá **Vimmi do nabídky aplikací** – odtud si ji připneš na panel,
-- na Ubuntu 24.04+ přidá AppArmor profil, který Electron aplikace potřebují.
+Skript stáhne hotovou aplikaci z posledního vydání, ověří její kontrolní součet (SHA-256), rozbalí ji (není potřeba FUSE) a přidá **Vimmi do nabídky aplikací** – odtud si ji připneš na panel. Vše se instaluje do domovské složky (`~/.local/opt/vimmi`), bez `sudo`.
 
-Vše se instaluje do domovské složky (`~/.local/opt/vimmi`); `sudo` se použije jen pro systémové balíčky a AppArmor.
-
-- **Aktualizace:** spusť stejný příkaz znovu.
+- **Aktualizace:** Vimmi se aktualizuje samo; ručně stačí spustit stejný příkaz znovu.
 - **Odinstalace:** `curl -fsSL https://raw.githubusercontent.com/gerchanisko/vimmi-app/main/install.sh | bash -s -- --uninstall` (poznámky a nastavení zůstanou).
-- **Ze stažených zdrojáků:** `git clone https://github.com/gerchanisko/vimmi-app && cd vimmi-app && ./install.sh`
 
 ### Windows 10 a 11
 
@@ -121,7 +114,7 @@ Synchronizuje se automaticky při spuštění, každých 15 sekund a při návra
 | **Ollama** | OpenAI-kompatibilní, lokálně | Zdarma, poznámky neopustí počítač. Model musí podporovat nástroje (tools). |
 | **Vlastní** | OpenAI Chat Completions | LM Studio, vLLM, Groq, Mistral, DeepSeek… s vlastní adresou serveru. |
 
-- Klíče se zadávají v **Nastavení → AI**, každý poskytovatel má vlastní. Ukládají se zašifrovaně přes systémovou klíčenku (Electron `safeStorage`) a nikdy se nedostanou do okna aplikace; všechna volání API probíhají v hlavním procesu.
+- Klíče se zadávají v **Nastavení → AI**, každý poskytovatel má vlastní. Ukládají se v systémové klíčence (Secret Service na Linuxu, Správce pověření na Windows); bez klíčenky do souboru, který může číst jen tvůj uživatel. Do trezoru ani do nastavení se nikdy nedostanou.
 - Pro vývoj fungují proměnné `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY`, `OPENROUTER_API_KEY` a `VIMMI_<POSKYTOVATEL>_BASE_URL` pro jiný server.
 - Názvy modelů se často mění, proto tlačítko **Načíst modely** stáhne aktuální seznam přímo od poskytovatele.
 - Nástroje AI jsou v [`shared/ai/tools.ts`](shared/ai/tools.ts) a sdílí je všichni poskytovatelé. Nový nástroj přidáš jedním záznamem `def({...})` se schématem v Zodu; u zapisujících nastavíš `write: true` a `preview`, aby šly schválit.
@@ -129,43 +122,42 @@ Synchronizuje se automaticky při spuštění, každých 15 sekund a při návra
 
 ## Vývoj
 
-Potřebuješ Node.js 22+.
+Potřebuješ Node.js 22+ a Rust (stable). Na Linuxu ještě WebKitGTK 4.1 (`webkit2gtk-4.1` na Archu, `libwebkit2gtk-4.1-dev` na Ubuntu); pro end-to-end test `tauri-driver` (`cargo install tauri-driver`) a WebKitWebDriver.
 
 ```bash
 npm install
-npm run dev        # vývojový režim s automatickým načítáním
-npm run dev:web    # webová aplikace v prohlížeči
-npm run build:web  # webová aplikace (PWA) do dist-web/
-npm start          # sestaví a spustí aplikaci
-npm test           # unit testy (parser, trezor, AI nástroje)
-npm run sync-e2e   # end-to-end test synchronizace: počítač ↔ telefon (webová verze) přes falešný GitHub
-npm run smoke      # end-to-end test: spustí aplikaci, proklikne funkce, AI (Claude, OpenAI, kompatibilní) proti mock serverům
-npm run install-desktop   # sestaví a nainstaluje do nabídky aplikací (po změnách v kódu)
-npm run dist:win   # instalátor pro Windows do release/ (na Windows)
-npm run dist:linux # AppImage pro Linux do release/
+npm run desktop:dev   # aplikace pro počítač ve vývojovém režimu
+npm run dev:web       # webová aplikace v prohlížeči
+npm run build:web     # webová aplikace (PWA) do dist-web/
+npm test              # unit testy (parser, trezor, AI nástroje)
+cargo test --manifest-path src-tauri/Cargo.toml   # testy Rustu (soubory, klíče, převzetí z Vimmi 0.7)
+npm run desktop:test  # end-to-end test aplikace přes WebDriver: funkce, AI, synchronizace, aktualizace
+npm run sync-e2e      # end-to-end test synchronizace: počítač ↔ telefon (webová verze) přes falešný GitHub
+npm run desktop:build # instalátor / AppImage do src-tauri/target/release/bundle/
 ```
 
 ### Vydání
 
-GitHub Actions ([`.github/workflows/release.yml`](.github/workflows/release.yml)) spouští unit i end-to-end testy na Windows a Linuxu. Při ručním spuštění nebo tagu `v*` sestaví `Vimmi-Setup.exe` a `Vimmi.AppImage` a přiloží je k vydání podle verze v `package.json`.
+GitHub Actions ([`.github/workflows/release.yml`](.github/workflows/release.yml)) spouští unit i end-to-end testy (desktopová aplikace přes WebDriver, synchronizace počítač–telefon). Při ručním spuštění nebo tagu `v*` sestaví `Vimmi-Setup.exe` (Windows) a `Vimmi.AppImage` (Linux), na Windows ověří aktualizaci z Vimmi 0.7, a vydání doplní o `latest.json` (podepsané aktualizace), `latest.yml` (aktualizace z Electronu 0.7) a `SHA256SUMS`. Podepisovací klíč aktualizací je v tajném nastavení repozitáře `TAURI_SIGNING_PRIVATE_KEY`.
 
 ### Struktura
 
 ```
 install.sh              instalační skript pro Linux
-electron/main.ts        hlavní proces: okno, IPC, otevírání trezoru, deník, šablony, PDF
-electron/preload.ts     bezpečné API pro okno (window.vimmi)
-electron/node-storage.ts  úložiště trezoru na disku se sledováním změn
-electron/settings.ts    nastavení a zašifrovaný API klíč
+src-tauri/              aplikace pro počítač v Rustu (Tauri): okno, soubory trezoru, hlídání změn,
+                        klíčenka, aktualizace, převzetí nastavení a klíčů z Vimmi 0.7
+tauri/                  backend okna (window.vimmi) nad sdíleným jádrem a příkazy Rustu
+electron/               původní aplikace v Electronu (do 0.7); API typy a ukázkový trezor sdílí i web
 shared/providers.ts     seznam poskytovatelů, výchozí modely, adresy
 shared/ai/tools.ts    nástroje pro práci s trezorem
 shared/vault.ts         jádro trezoru nezávislé na úložišti (disk na počítači, IndexedDB v prohlížeči)
 shared/sync.ts          synchronizace přes GitHub API (tříčestné porovnání, konflikty)
-shared/ai/              AI asistent, nástroje a smyčky pro poskytovatele (běží v Electronu i v prohlížeči)
+shared/ai/              AI asistent, nástroje a smyčky pro poskytovatele (běží v aplikaci i v prohlížeči)
 shared/                 parser Markdownu (odkazy, tagy, úkoly) a sdílené typy
 web/                    webová aplikace: backend v prohlížeči, IndexedDB, manifest a service worker
 src/                    rozhraní v Reactu (CodeMirror 6, markdown-it, d3-force)
-test/                   unit testy (Vitest) a smoke test (Playwright + Electron)
+test/                   unit testy (Vitest), end-to-end test aplikace (tauri-smoke.mjs, WebDriver)
+                        a synchronizace počítač–telefon (sync-e2e.mjs)
 ```
 
 ## Bezpečnost

@@ -1,0 +1,73 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Vimmi",
+  "mainBinaryName": "vimmi",
+  "version": "../package.json",
+  "identifier": "io.github.gerchanisko.vimmi",
+  "build": {
+    "frontendDist": "../dist-tauri",
+    "devUrl": "http://localhost:5196",
+    "beforeDevCommand": "npm run dev:tauri-web",
+    "beforeBuildCommand": "npm run build:tauri-web"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "Vimmi",
+        "width": 1360,
+        "height": 860,
+        "minWidth": 720,
+        "minHeight": 480,
+        "dragDropEnabled": false
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self' ipc: http://ipc.localhost; img-src 'self' data: blob: https: vimmi-file: http://vimmi-file.localhost; style-src 'self' 'unsafe-inline'; font-src 'self' data:; script-src 'self'; connect-src 'self' ipc: http://ipc.localhost"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": [
+      "appimage",
+      "nsis"
+    ],
+    "category": "Productivity",
+    "shortDescription": "Poznámky, úkoly a kalendář s AI",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.png",
+      "icons/icon.ico"
+    ],
+    "createUpdaterArtifacts": true,
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser",
+        "installerHooks": "windows/hooks.nsh",
+        "languages": [
+          "Czech",
+          "English"
+        ],
+        "displayLanguageSelector": false
+      }
+    },
+    "linux": {
+      "appimage": {
+        "bundleMediaFramework": false
+      }
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEM4MUY3NTg0REQwOEI4OUYKUldTZnVBamRoSFVmeUMwUWIrTTNycVlUVUd1bkJCQVB4Zll1RzhoaUxsYjg5VzZVUDJkWWdLbzMK",
+      "endpoints": [
+        "https://github.com/gerchanisko/vimmi-app/releases/latest/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
+    }
+  }
+}

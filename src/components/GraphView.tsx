@@ -111,7 +111,7 @@ export default function GraphView({ focus }: { focus?: string }) {
       neighbors.get(l.target)!.add(l.source);
     }
 
-    const colors = {
+    const readColors = () => ({
       note: cssVar("--text-2"),
       project: cssVar("--accent"),
       tag: cssVar("--sage"),
@@ -120,7 +120,17 @@ export default function GraphView({ focus }: { focus?: string }) {
       text: cssVar("--text"),
       accent: cssVar("--accent"),
       bg: cssVar("--bg"),
+    });
+    let colors = readColors();
+    // Switching between light and dark repaints the graph in the new colours.
+    const recolor = () => {
+      colors = readColors();
+      draw();
     };
+    const themeObserver = new MutationObserver(recolor);
+    themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+    const schemeQuery = matchMedia("(prefers-color-scheme: dark)");
+    schemeQuery.addEventListener("change", recolor);
 
     const resize = () => {
       width = wrap.clientWidth;
@@ -257,6 +267,8 @@ export default function GraphView({ focus }: { focus?: string }) {
     transform = { x: width / 2, y: height / 2, k: nodes.length > 150 ? 0.6 : 1 };
 
     return () => {
+      themeObserver.disconnect();
+      schemeQuery.removeEventListener("change", recolor);
       sim.stop();
       ro.disconnect();
       canvas.removeEventListener("pointerdown", onDown);

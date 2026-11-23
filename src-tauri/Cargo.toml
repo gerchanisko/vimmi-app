@@ -1,0 +1,56 @@
+[package]
+name = "vimmi"
+version = "0.8.0"
+description = "Vimmi – poznámky, úkoly a kalendář s AI"
+edition = "2021"
+license = "GPL-3.0-or-later"
+publish = false
+
+[lib]
+name = "vimmi_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+tauri-plugin-opener = "2"
+tauri-plugin-http = "2"
+tauri-plugin-notification = "2"
+tauri-plugin-updater = "2"
+tauri-plugin-process = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+notify = "8"
+keyring = { version = "3", features = ["sync-secret-service", "crypto-rust", "windows-native", "apple-native"] }
+gethostname = "1"
+percent-encoding = "2"
+mime_guess = "2"
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
+dirs = "6"
+url = "2"
+# Reading the keys the Electron app (0.7.x) saved, once, after the update.
+aes = "0.8"
+cbc = { version = "0.1", features = ["alloc"] }
+pbkdf2 = "0.12"
+sha1 = "0.10"
+aes-gcm = "0.10"
+base64 = "0.22"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+dbus-secret-service = { version = "4", features = ["crypto-rust"] }
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_Security_Cryptography"] }
+
+[dev-dependencies]
+tempfile = "3"
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "s"
+panic = "abort"
+strip = true
