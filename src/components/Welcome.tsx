@@ -74,7 +74,7 @@ function WebWelcome({ run }: { run: (fn: () => Promise<VaultSnapshot | null>) =>
         <p className="lead">Všechno důležité. Na jednom místě.</p>
         <p className="muted">
           Poznámky, úkoly a projekty s AI asistentem. Ukládají se v tomto zařízení a přes GitHub je můžeš synchronizovat s počítačem –{" "}
-          <a href="https://vimmi.space/navod.html#sync" target="_blank" rel="noreferrer">
+          <a href="https://gerchanisko.github.io/vimmi/navod.html#sync" target="_blank" rel="noreferrer">
             návod
           </a>
           .
