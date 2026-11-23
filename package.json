@@ -20,7 +20,12 @@
     "dist:linux": "npm run build && electron-builder --linux AppImage --publish never",
     "build:web": "tsc --noEmit -p . && vite build --config vite.web.config.mts",
     "dev:web": "vite --config vite.web.config.mts",
-    "sync-e2e": "npm run build && npm run build:web && node test/sync-e2e.mjs"
+    "sync-e2e": "npm run build && npm run build:web && node test/sync-e2e.mjs",
+    "build:tauri-web": "tsc --noEmit -p . && vite build --config vite.tauri.config.mts",
+    "dev:tauri-web": "vite --config vite.tauri.config.mts",
+    "tauri": "tauri",
+    "beta:build": "tauri build --no-bundle",
+    "beta:dev": "tauri dev"
   },
   "build": {
     "appId": "io.github.gerchanisko.vimmi",
@@ -85,6 +90,11 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.133.0",
+    "@tauri-apps/api": "^2.12.5",
+    "@tauri-apps/plugin-dialog": "^2.8.4",
+    "@tauri-apps/plugin-http": "^2.9.0",
+    "@tauri-apps/plugin-notification": "^2.8.1",
+    "@tauri-apps/plugin-opener": "^2.7.3",
     "electron-updater": "^6.8.9",
     "js-yaml": "^5.4.3",
     "markdown-it": "^15.0.2",
@@ -103,6 +113,7 @@
     "@codemirror/view": "^6.43.14",
     "@lezer/highlight": "^1.2.5",
     "@replit/codemirror-vim": "^6.4.0",
+    "@tauri-apps/cli": "^2.12.6",
     "@types/d3-force": "^3.0.10",
     "@types/node": "^26.6.5",
     "@types/react": "^19.3.0",

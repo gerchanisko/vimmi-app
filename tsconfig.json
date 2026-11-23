@@ -27,6 +27,8 @@
     "shared",
     "test",
     "web",
+    "tauri",
+    "vite.tauri.config.mts",
     "vite.config.mts",
     "vite.web.config.mts"
   ]
