@@ -1,6 +1,6 @@
 [package]
 name = "vimmi"
-version = "0.8.0"
+version = "0.8.1"
 description = "Vimmi – poznámky, úkoly a kalendář s AI"
 edition = "2021"
 license = "GPL-3.0-or-later"

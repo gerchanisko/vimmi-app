@@ -411,6 +411,31 @@ fn serve_file(app: &AppHandle, uri_path: &str) -> tauri::http::Response<Vec<u8>>
     }
 }
 
+/// Startup steps go to startup.log in the settings folder (a fresh file each start), so a start that
+/// stops halfway shows where. VIMMI_EXIT_AFTER_START (tests) closes the app once the UI is up or failed.
+#[tauri::command]
+fn startup_log(app: AppHandle, step: String) {
+    use std::io::Write;
+    let step: String = step.chars().filter(|c| !c.is_control()).take(500).collect();
+    if let Ok(dir) = config_dir(&app) {
+        let _ = std::fs::create_dir_all(&dir);
+        if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(dir.join("startup.log")) {
+            let _ = writeln!(f, "{} {step}", chrono::Utc::now().format("%H:%M:%S%.3f"));
+        }
+    }
+    if std::env::var_os("VIMMI_EXIT_AFTER_START").is_some() && (step.starts_with("ui ready") || step.starts_with("error")) {
+        app.exit(if step.starts_with("error") { 1 } else { 0 });
+    }
+}
+
+fn start_log(app: &AppHandle) {
+    if let Ok(dir) = config_dir(app) {
+        let _ = std::fs::create_dir_all(&dir);
+        let head = format!("Vimmi {} ({} {})\n", app.package_info().version, std::env::consts::OS, std::env::consts::ARCH);
+        let _ = std::fs::write(dir.join("startup.log"), head);
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -421,9 +446,14 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .manage(AppState::default())
+        .setup(|app| {
+            start_log(app.handle());
+            Ok(())
+        })
         .register_uri_scheme_protocol("vimmi-file", |ctx, req| serve_file(ctx.app_handle(), req.uri().path()))
         .invoke_handler(tauri::generate_handler![
             env_info,
+            startup_log,
             settings_read,
             settings_write,
             secret_get,

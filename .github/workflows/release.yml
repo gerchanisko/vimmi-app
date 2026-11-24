@@ -101,7 +101,23 @@ jobs:
       - run: cargo test --manifest-path src-tauri/Cargo.toml
       - run: npx tauri build --debug --no-bundle
       - run: node scripts/build-electron.mjs
+      # The first start after the update from Vimmi 0.7: the app must get all the way to its UI.
+      - name: Start like after the update from Vimmi 0.7
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $t = Join-Path $env:RUNNER_TEMP "start"
+          New-Item -ItemType Directory -Force "$t\old", "$t\new", "$t\Trezor" | Out-Null
+          Set-Content "$t\Trezor\Ahoj.md" "# Ahoj`n`n- [ ] úkol"
+          @{ vaultPath = "$t\Trezor"; recentVaults = @("$t\Trezor"); theme = "dark"; provider = "gemini" } | ConvertTo-Json | Set-Content "$t\old\settings.json"
+          $env:VIMMI_USER_DATA = "$t\new"; $env:VIMMI_ELECTRON_DIR = "$t\old"; $env:VIMMI_EXIT_AFTER_START = "1"
+          $p = Start-Process src-tauri\target\debug\vimmi.exe -PassThru
+          if (-not $p.WaitForExit(90000)) { Stop-Process $p -Force; Get-Content "$t\new\startup.log"; throw "the app did not finish starting within 90 s" }
+          Get-Content "$t\new\startup.log"
+          if (-not (Select-String -Path "$t\new\startup.log" -Pattern "ui ready" -Quiet)) { throw "the UI did not come up" }
       - name: End-to-end test of the desktop app
+        # WebDriver on Windows CI does not attach to the app yet; the start check above is the gate.
+        continue-on-error: true
         run: node test/tauri-smoke.mjs
       - name: Upload screenshots
         if: always()
@@ -171,6 +187,10 @@ jobs:
           $key = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\750d9110-42f7-5bf9-afcf-8d3ea3b5eaae"
           $oldDir = (Get-ItemProperty "HKCU:\Software\750d9110-42f7-5bf9-afcf-8d3ea3b5eaae").InstallLocation
           if (-not (Test-Path "$oldDir\Vimmi.exe")) { throw "Vimmi 0.7.3 did not install" }
+          # Settings as Vimmi 0.7 leaves them: a vault the new app has to open.
+          New-Item -ItemType Directory -Force "$env:APPDATA\Vimmi", "$env:USERPROFILE\Documents\Vimmi" | Out-Null
+          Set-Content "$env:USERPROFILE\Documents\Vimmi\Ahoj.md" "# Ahoj"
+          @{ vaultPath = "$env:USERPROFILE\Documents\Vimmi"; recentVaults = @(); theme = "system" } | ConvertTo-Json | Set-Content "$env:APPDATA\Vimmi\settings.json"
           # Only the installer is awaited: it starts the new app, which keeps running.
           (Start-Process out\Vimmi-Setup.exe -ArgumentList "--updated","/S","--force-run" -PassThru).WaitForExit()
           Start-Sleep -Seconds 5
@@ -179,6 +199,11 @@ jobs:
           $new = "$env:LOCALAPPDATA\Vimmi\vimmi.exe"
           if (-not (Test-Path $new)) { throw "the new app is not installed at $new" }
           if (-not (Get-Process vimmi -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $new })) { throw "the new app did not start" }
+          # Not only running: it must reach its UI (the empty window of 0.8.0 ran too).
+          $log = "$env:APPDATA\io.github.gerchanisko.vimmi\startup.log"
+          for ($i = 0; $i -lt 60 -and -not ((Test-Path $log) -and (Select-String -Path $log -Pattern "ui ready" -Quiet)); $i++) { Start-Sleep -Seconds 1 }
+          if (Test-Path $log) { Get-Content $log }
+          if (-not (Select-String -Path $log -Pattern "ui ready" -Quiet)) { throw "the new app did not reach its UI" }
           Get-ChildItem "$env:APPDATA\Microsoft\Windows\Start Menu\Programs" -Recurse -Filter "Vimmi*.lnk" | ForEach-Object { $_.FullName }
           if (-not (Get-ChildItem "$env:APPDATA\Microsoft\Windows\Start Menu\Programs" -Recurse -Filter "Vimmi.lnk")) { throw "no Start menu shortcut" }
           Stop-Process -Name vimmi -Force
