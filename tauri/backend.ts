@@ -35,6 +35,7 @@ import { Vault } from "../shared/vault";
 import { dailyNote, noteFromTemplate, templatePaths } from "../shared/vault-actions";
 import { CalendarFeed } from "../shared/calendar-feed";
 import { CalendarSubscriptions } from "../shared/calendar-subs";
+import { routedThroughRust } from "./fetch-route";
 import { TauriStorage } from "./storage";
 
 interface EnvInfo {
@@ -47,13 +48,12 @@ interface EnvInfo {
   env_keys: Record<string, string>;
 }
 
-/** Web requests to other sites go through Rust (no browser CORS), like Electron's main process did. */
+/** Web requests to other sites go through Rust (no browser CORS); see fetch-route.ts. */
 function routeFetchThroughRust() {
   const own = globalThis.fetch.bind(globalThis);
   globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
     const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
-    if (/^https?:\/\//i.test(url) && new URL(url).origin !== location.origin) return tauriFetch(input, init);
-    return own(input, init);
+    return routedThroughRust(url, location.origin) ? tauriFetch(input, init) : own(input, init);
   }) as typeof fetch;
 }
 

@@ -60,11 +60,13 @@ fs.writeFileSync(
 // one is another program, so a replaced file is easy to tell.
 const upd = path.join(tmp, "update");
 fs.mkdirSync(upd);
-const npx = (args) => execFileSync(win ? "npx.cmd" : "npx", args, { stdio: "ignore", shell: win });
-npx(["tauri", "signer", "generate", "--ci", "-p", '""', "-w", JSON.stringify(path.join(upd, "test.key"))]);
+// Windows runs npx.cmd through the shell, which needs quoted arguments.
+const q = (a) => (win ? JSON.stringify(a) : a);
+const npx = (args) => execFileSync(win ? "npx.cmd" : "npx", args.map(q), { stdio: "ignore", shell: win });
+npx(["tauri", "signer", "generate", "--ci", "-p", "", "-w", path.join(upd, "test.key")]);
 const payload = path.join(upd, "Vimmi.AppImage");
 fs.copyFileSync(win ? process.execPath : "/usr/bin/true", payload);
-npx(["tauri", "signer", "sign", "-f", JSON.stringify(path.join(upd, "test.key")), "-p", '""', JSON.stringify(payload)]);
+npx(["tauri", "signer", "sign", "-f", path.join(upd, "test.key"), "-p", "", payload]);
 const installedExe = path.join(upd, "installed", "Vimmi.AppImage");
 fs.mkdirSync(path.dirname(installedExe));
 fs.copyFileSync(win ? "C:\\Windows\\System32\\where.exe" : "/usr/bin/false", installedExe);
