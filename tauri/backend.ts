@@ -35,6 +35,7 @@ import { Vault } from "../shared/vault";
 import { dailyNote, noteFromTemplate, templatePaths } from "../shared/vault-actions";
 import { CalendarFeed } from "../shared/calendar-feed";
 import { CalendarSubscriptions } from "../shared/calendar-subs";
+import { routedThroughRust } from "./fetch-route";
 import { TauriStorage } from "./storage";
 
 interface EnvInfo {
@@ -47,13 +48,12 @@ interface EnvInfo {
   env_keys: Record<string, string>;
 }
 
-/** Web requests to other sites go through Rust (no browser CORS), like Electron's main process did. */
+/** Web requests to other sites go through Rust (no browser CORS); see fetch-route.ts. */
 function routeFetchThroughRust() {
   const own = globalThis.fetch.bind(globalThis);
   globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
     const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
-    if (/^https?:\/\//i.test(url) && new URL(url).origin !== location.origin) return tauriFetch(input, init);
-    return own(input, init);
+    return routedThroughRust(url, location.origin) ? tauriFetch(input, init) : own(input, init);
   }) as typeof fetch;
 }
 
@@ -110,12 +110,21 @@ function printHtml(html: string) {
   document.body.appendChild(frame);
 }
 
+/** Records a startup step in startup.log (Rust) and shows it in the window until the UI appears. */
+export function startStep(step: string): void {
+  void invoke("startup_log", { step }).catch(() => {});
+  const status = document.getElementById("start-status");
+  if (status) status.textContent = step;
+}
+
 export async function installBackend(): Promise<void> {
+  startStep("page loaded");
   routeFetchThroughRust();
   openLinksOutside();
   await systemNotifications();
 
   const env = await invoke<EnvInfo>("env_info");
+  startStep("app info");
   const win = getCurrentWindow();
   const bus = new Emitter();
   const githubApi = () => env.github_api ?? undefined;
@@ -125,9 +134,11 @@ export async function installBackend(): Promise<void> {
   // First start after the update from the Electron app: its settings come with settings_read,
   // its saved keys are moved into the keyring here (nobody has to enter them again).
   const stored = await invoke<{ json: string | null; imported: boolean }>("settings_read");
+  startStep(stored.imported ? "settings taken over from Vimmi 0.7" : "settings read");
   if (stored.imported) await invoke<string[]>("import_electron_keys").catch(() => []);
 
   const secrets = new Map<string, string>();
+  if (stored.imported) startStep("keys taken over");
   for (const id of [...PROVIDERS.map((p) => p.id), "github"]) {
     const v = await invoke<string | null>("secret_get", { id }).catch(() => null);
     if (v) secrets.set(id, v);
@@ -177,6 +188,7 @@ export async function installBackend(): Promise<void> {
   };
   const applyTheme = (t: Settings["theme"]) => void win.setTheme(t === "system" ? null : t).catch(() => {});
   applyTheme(settings.theme);
+  startStep("keys and settings ready");
 
   // ---------- vault ----------
 
@@ -241,6 +253,7 @@ export async function installBackend(): Promise<void> {
 
   // Reopen the last vault (settings imported from the Electron app point to the same folder).
   if (settings.vaultPath) {
+    startStep("opening the vault");
     try {
       await openVault(settings.vaultPath);
     } catch {
@@ -506,4 +519,5 @@ export async function installBackend(): Promise<void> {
     },
   };
   window.vimmi = api;
+  startStep(vault ? `backend ready (${vault.snapshot().notes.length} notes)` : "backend ready (no vault)");
 }

@@ -1,4 +1,5 @@
-// End-to-end test of the Rust desktop app (Tauri beta) through WebDriver (tauri-driver + WebKitWebDriver):
+// End-to-end test of the desktop app (Rust/Tauri) through WebDriver (tauri-driver + WebKitWebDriver on
+// Linux, msedgedriver on Windows):
 // a temporary vault and settings, a mock AI server, a fake GitHub; clicks through the main features.
 // Usage: npx tauri build --debug --no-bundle && node scripts/build-electron.mjs && node test/tauri-smoke.mjs [binary]
 import { execFileSync, spawn } from "node:child_process";
@@ -10,7 +11,8 @@ import { apiUrl, chatRequests, server } from "./mock-ai.mjs";
 import { FakeGitHub, serveFakeGitHub } from "../dist-electron/fake-github-for-test.mjs";
 import { sampleNotes } from "../dist-electron/sample-for-test.cjs";
 
-const binary = path.resolve(process.argv[2] ?? "src-tauri/target/debug/vimmi");
+const win = process.platform === "win32";
+const binary = path.resolve(process.argv[2] ?? `src-tauri/target/debug/vimmi${win ? ".exe" : ""}`);
 const shots = path.resolve("test/screenshots-tauri");
 fs.mkdirSync(shots, { recursive: true });
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "vimmi-tauri-"));
@@ -58,19 +60,22 @@ fs.writeFileSync(
 // one is another program, so a replaced file is easy to tell.
 const upd = path.join(tmp, "update");
 fs.mkdirSync(upd);
-execFileSync("npx", ["tauri", "signer", "generate", "--ci", "-p", "", "-w", path.join(upd, "test.key")], { stdio: "ignore" });
+// Windows runs npx.cmd through the shell, which needs quoted arguments.
+const q = (a) => (win ? JSON.stringify(a) : a);
+const npx = (args) => execFileSync(win ? "npx.cmd" : "npx", args.map(q), { stdio: "ignore", shell: win });
+npx(["tauri", "signer", "generate", "--ci", "-p", "", "-w", path.join(upd, "test.key")]);
 const payload = path.join(upd, "Vimmi.AppImage");
-fs.copyFileSync("/usr/bin/true", payload);
-execFileSync("npx", ["tauri", "signer", "sign", "-f", path.join(upd, "test.key"), "-p", "", payload], { stdio: "ignore" });
+fs.copyFileSync(win ? process.execPath : "/usr/bin/true", payload);
+npx(["tauri", "signer", "sign", "-f", path.join(upd, "test.key"), "-p", "", payload]);
 const installedExe = path.join(upd, "installed", "Vimmi.AppImage");
 fs.mkdirSync(path.dirname(installedExe));
-fs.copyFileSync("/usr/bin/false", installedExe);
+fs.copyFileSync(win ? "C:\\Windows\\System32\\where.exe" : "/usr/bin/false", installedExe);
 let serveTampered = true;
 const feed = http.createServer((req, res) => {
   const base = `http://127.0.0.1:${feed.address().port}`;
   if (req.url === "/latest.json") {
     res.writeHead(200, { "content-type": "application/json" });
-    res.end(JSON.stringify({ version: "9.9.9", notes: "", pub_date: new Date().toISOString(), platforms: { "linux-x86_64": { signature: fs.readFileSync(`${payload}.sig`, "utf8"), url: `${base}/Vimmi.AppImage` } } }));
+    res.end(JSON.stringify({ version: "9.9.9", notes: "", pub_date: new Date().toISOString(), platforms: { [win ? "windows-x86_64" : "linux-x86_64"]: { signature: fs.readFileSync(`${payload}.sig`, "utf8"), url: `${base}/Vimmi.AppImage` } } }));
     return;
   }
   // A changed file under the same signature must be refused.
@@ -82,7 +87,10 @@ await new Promise((r) => feed.listen(0, "127.0.0.1", r));
 
 // ---------- tiny WebDriver client ----------
 const port = 4444 + Math.floor(Math.random() * 500);
-const driver = spawn(path.join(os.homedir(), ".cargo/bin/tauri-driver"), ["--port", String(port)], {
+// On Windows the WebView2 driver (msedgedriver.exe) comes from MSEDGEDRIVER or the current folder.
+const driverArgs = ["--port", String(port)];
+if (win) driverArgs.push("--native-driver", process.env.MSEDGEDRIVER || path.resolve("msedgedriver.exe"));
+const driver = spawn(path.join(os.homedir(), ".cargo", "bin", `tauri-driver${win ? ".exe" : ""}`), driverArgs, {
   env: {
     ...process.env,
     VIMMI_USER_DATA: userData,
@@ -187,7 +195,7 @@ try {
     await waitFor(".workspace", 30000);
     await waitFor(".cm-content");
     const info = await js("return { kind: window.vimmi.app.kind, platform: window.vimmi.app.platform, title: document.title }");
-    if (info.kind !== "desktop" || info.platform !== "linux") throw new Error(JSON.stringify(info));
+    if (info.kind !== "desktop" || info.platform !== (win ? "win32" : "linux")) throw new Error(JSON.stringify(info));
     const version = await apiOk("return window.vimmi.app.version()");
     if (version !== JSON.parse(fs.readFileSync("package.json", "utf8")).version) throw new Error(`version ${version}`);
     await sleep(400);
@@ -332,7 +340,7 @@ try {
     if (!s.keys.anthropic) throw new Error("key not reported");
     const stored = JSON.parse(fs.readFileSync(path.join(userData, "secrets.json"), "utf8"));
     if (stored.anthropic !== "sk-ant-test-key") throw new Error("key not stored");
-    if ((fs.statSync(path.join(userData, "secrets.json")).mode & 0o777) !== 0o600) throw new Error("key file readable by others");
+    if (!win && (fs.statSync(path.join(userData, "secrets.json")).mode & 0o777) !== 0o600) throw new Error("key file readable by others");
     if (/sk-ant|AIza/.test(fs.readFileSync(path.join(userData, "settings.json"), "utf8"))) throw new Error("key in settings.json");
     await apiOk(`await window.vimmi.settings.setKey("anthropic", null)`);
     if (JSON.parse(fs.readFileSync(path.join(userData, "secrets.json"), "utf8")).anthropic) throw new Error("key not removed");
@@ -368,8 +376,11 @@ try {
     serveTampered = false;
     const ok = await call("updater_download");
     if (ok && ok.__error) throw new Error(`download failed: ${ok.__error}`);
-    await apiOk("return window.__TAURI_INTERNALS__.invoke('updater_install')");
-    if (!fs.readFileSync(installedExe).equals(fs.readFileSync(payload))) throw new Error("the update was not installed");
+    // Installing on Windows starts the installer and closes the app, so only Linux installs here.
+    if (!win) {
+      await apiOk("return window.__TAURI_INTERNALS__.invoke('updater_install')");
+      if (!fs.readFileSync(installedExe).equals(fs.readFileSync(payload))) throw new Error("the update was not installed");
+    }
   });
 
   await step("settings persist on disk and dark theme switches", async () => {
@@ -391,6 +402,8 @@ try {
   console.log("FAILED");
   console.error(err);
   await shot("failure").catch(() => {});
+  console.error("page text:", JSON.stringify(await js("return document.body ? document.body.innerText.slice(0, 600) : 'no body'").catch((e) => String(e))));
+  console.error("page state:", JSON.stringify(await js("return { vimmi: typeof window.vimmi, tauri: typeof window.__TAURI_INTERNALS__, root: document.getElementById('root')?.innerHTML.length, url: location.href }").catch((e) => String(e))));
   console.error("user data:", fs.existsSync(userData) ? fs.readdirSync(userData) : "missing");
   console.error("settings:", JSON.stringify(await api("const s = await window.vimmi.settings.get(); return { vaultPath: s.vaultPath, provider: s.provider }").catch((e) => String(e))));
   console.error("stored:", JSON.stringify(await api("return window.__TAURI_INTERNALS__.invoke('settings_read')").catch((e) => String(e))));
