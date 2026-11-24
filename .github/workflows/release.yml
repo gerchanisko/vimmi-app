@@ -80,10 +80,41 @@ jobs:
           path: test/screenshots-tauri
           if-no-files-found: ignore
 
+  test-desktop-windows:
+    name: Test desktop app (Windows)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - run: cargo install tauri-driver --locked
+      # The WebView2 driver must match the installed WebView2 version.
+      - run: cargo install --git https://github.com/chippers/msedgedriver-tool
+      - run: msedgedriver-tool.exe
+      - run: npm ci
+      - run: cargo test --manifest-path src-tauri/Cargo.toml
+      - run: npx tauri build --debug --no-bundle
+      - run: node scripts/build-electron.mjs
+      - name: End-to-end test of the desktop app
+        run: node test/tauri-smoke.mjs
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-screenshots-windows
+          path: test/screenshots-tauri
+          if-no-files-found: ignore
+
   build:
     name: Build (${{ matrix.os }})
     if: github.event_name != 'pull_request'
-    needs: [test, test-desktop]
+    needs: [test, test-desktop, test-desktop-windows]
     strategy:
       matrix:
         include:
