@@ -406,6 +406,28 @@ try {
     await press("Escape");
   });
 
+  await step("Claude sees the open note (get_open_note through vimmi --mcp)", async () => {
+    await click(".tabbar .tab", "Cesty");
+    const ctxFile = path.join(userData, "open-note.json");
+    await until("open note written", async () => fs.existsSync(ctxFile) && !!JSON.parse(fs.readFileSync(ctxFile, "utf8")).activePath, 10000);
+    const ctx = JSON.parse(fs.readFileSync(ctxFile, "utf8"));
+    const exe = path.resolve("src-tauri/target/debug", win ? "vimmi.exe" : "vimmi");
+    const out = execFileSync(exe, ["--mcp"], {
+      env: { ...process.env, VIMMI_USER_DATA: userData },
+      input: [
+        { jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "t", version: "1" } } },
+        { jsonrpc: "2.0", id: 2, method: "tools/call", params: { name: "get_open_note", arguments: {} } },
+      ]
+        .map((m) => JSON.stringify(m))
+        .join("\n") + "\n",
+      timeout: 90000,
+      encoding: "utf8",
+    });
+    const reply = out.split("\n").filter(Boolean).map((l) => JSON.parse(l)).find((m) => m.id === 2);
+    const text = reply?.result?.content?.[0]?.text ?? "";
+    if (!text.includes(`Otevřená poznámka: ${ctx.activePath}`)) throw new Error(`get_open_note: ${text.slice(0, 200)}`);
+  });
+
   if (!win)
     await step("Claude Code panel: a terminal runs claude with Vimmi's MCP server in the vault", async () => {
       await click("button[aria-label^='Claude Code']");
@@ -420,6 +442,8 @@ try {
       await until("typed line reached claude", async () => (await screen()).includes("got: ahoj z Vimmi"), 10000);
       await until("exit shown", async () => (await screen()).includes("Claude Code skončil"), 10000);
       await shot("06b-claude-terminal");
+      const clip = await js("const box = document.querySelector('.claude-terminal-screen').getBoundingClientRect(); const scr = document.querySelector('.claude-terminal .xterm-screen').getBoundingClientRect(); return Math.round(scr.bottom - box.bottom)");
+      if (clip > 0) throw new Error(`the terminal's last ${clip}px are cut off`);
       await click("button", "Spustit znovu");
       await until("restarted", async () => (await screen()).includes("FAKE CLAUDE"), 15000);
     });

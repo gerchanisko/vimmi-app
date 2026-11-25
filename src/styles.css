@@ -1404,10 +1404,13 @@ label.check {
 .claude-terminal-screen {
   flex: 1;
   min-height: 0;
-  padding: 6px 0 6px 8px;
+  overflow: hidden;
 }
+/* The padding sits on the terminal itself: the fit addon subtracts it when counting rows. */
 .claude-terminal-screen .xterm {
   height: 100%;
+  padding: 6px 0 6px 8px;
+  box-sizing: border-box;
 }
 .claude-terminal-note {
   padding: 16px;

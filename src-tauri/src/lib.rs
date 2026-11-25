@@ -79,7 +79,7 @@ fn env_info(app: AppHandle) -> EnvInfo {
     }
 }
 
-fn config_dir(app: &AppHandle) -> Res<PathBuf> {
+pub(crate) fn config_dir(app: &AppHandle) -> Res<PathBuf> {
     if let Ok(dir) = std::env::var("VIMMI_USER_DATA") {
         return Ok(PathBuf::from(dir));
     }
@@ -481,6 +481,11 @@ fn start_log(app: &AppHandle) {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // The hidden window of `vimmi --mcp` needs no accessibility bridge; without an accessibility bus
+    // (some systems, CI) GTK would wait for it about half a minute before the server answers.
+    if mcp::requested() {
+        std::env::set_var("NO_AT_BRIDGE", "1");
+    }
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
@@ -533,9 +538,12 @@ pub fn run() {
             private_list,
             mcp::mcp_read,
             mcp::mcp_write,
+            mcp::mcp_done,
             mcp::mcp_setup,
             mcp::mcp_add_to_claude_code,
             mcp::mcp_add_to_claude_desktop,
+            mcp::claude_context_set,
+            mcp::claude_context_get,
             terminal::terminal_open,
             terminal::terminal_write,
             terminal::terminal_resize,

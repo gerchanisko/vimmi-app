@@ -78,3 +78,37 @@ describe("MCP server", () => {
     expect(JSON.parse((await mcp.handleLine("{nope"))!).error.code).toBe(-32700);
   });
 });
+
+describe("MCP get_open_note", () => {
+  async function withContext(ctx: unknown) {
+    const storage = new MemoryStorage();
+    await storage.writeText("Vg.md", "# Vg\ntest !!!\n");
+    const vault = new Vault(storage);
+    await vault.load();
+    const env = { vault, dailyFolder: "Deník", openNote: () => {} };
+    const mcp = createMcpServer({ version: "1", env: async () => env, openContext: async () => ctx as never });
+    const call = async () => JSON.parse((await mcp.handleLine(JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "get_open_note", arguments: {} } })))!).result;
+    const list = JSON.parse((await mcp.handleLine(JSON.stringify({ jsonrpc: "2.0", id: 2, method: "tools/list" })))!).result.tools;
+    return { call, list, root: vault.root };
+  }
+
+  it("returns the open note with its content and selection", async () => {
+    const { call, list } = await withContext({ vault: "mem", activePath: "Vg.md", selection: "test", openPaths: ["Vg.md", "Jiná.md"] });
+    expect(list[0].name).toBe("get_open_note");
+    const r = await call();
+    expect(r.content[0].text).toContain("Otevřená poznámka: Vg.md");
+    expect(r.content[0].text).toContain("test !!!");
+    expect(r.content[0].text).toContain("Vybraný text");
+    expect(r.content[0].text).toContain("Jiná.md");
+  });
+
+  it("says when Vimmi is closed, nothing is open, or another vault is open", async () => {
+    expect((await (await withContext(null)).call()).content[0].text).toContain("neběží");
+    expect((await (await withContext({ vault: "mem", activePath: null, selection: null, openPaths: [] })).call()).content[0].text).toContain("není otevřená");
+    expect((await (await withContext({ vault: "/jinde", activePath: "Vg.md", selection: null, openPaths: [] })).call()).content[0].text).toContain("jiný trezor");
+  });
+
+  it("is not offered without the app context", async () => {
+    expect(mcpToolList().some((t) => t.name === "get_open_note")).toBe(false);
+  });
+});

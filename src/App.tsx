@@ -18,6 +18,7 @@ import { isMobile, useMobile } from "./lib/mobile";
 import { SyncIndicator } from "./components/Sync";
 import { UpdateBanner } from "./components/Update";
 import { handleShortcut } from "./lib/commands";
+import { startClaudeContext } from "./lib/claude-context";
 import { startReminders } from "./lib/reminders";
 import { flushAll, reloadDoc } from "./lib/docs";
 import { closeTab, getState, openNote, openView, refreshSnapshot, setState, useApp, type Tab } from "./lib/store";
@@ -40,6 +41,7 @@ export default function App() {
 
   // Boot: load settings and the last vault.
   useEffect(() => startReminders(), []);
+  useEffect(() => startClaudeContext(), []);
 
   useEffect(() => {
     void (async () => {

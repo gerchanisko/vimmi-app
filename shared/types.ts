@@ -308,6 +308,8 @@ export interface ClaudeTerminalApi {
 
 export interface ClaudeConnectApi {
   setup(): Promise<ClaudeSetup>;
+  /** What is open in Vimmi (JSON), for the MCP tool get_open_note; null when Vimmi closes. */
+  setOpenNote(json: string | null): Promise<void>;
   terminal: ClaudeTerminalApi;
   addToClaudeCode(): Promise<void>;
   addToClaudeDesktop(): Promise<void>;
