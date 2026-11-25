@@ -508,6 +508,19 @@ export async function installBackend(): Promise<void> {
       setup: () => invoke<ClaudeSetup>("mcp_setup"),
       addToClaudeCode: () => invoke<void>("mcp_add_to_claude_code"),
       addToClaudeDesktop: () => invoke<void>("mcp_add_to_claude_desktop"),
+      // The Claude Code panel (src-tauri/src/terminal.rs): output arrives as raw bytes.
+      terminal: {
+        open: (cols, rows, onData, onExit) => {
+          const data = new Channel<ArrayBuffer | number[]>();
+          data.onmessage = (d) => onData(new Uint8Array(d));
+          const exit = new Channel<number>();
+          exit.onmessage = onExit;
+          return invoke<number>("terminal_open", { cols, rows, onData: data, onExit: exit });
+        },
+        write: (id, data) => invoke<void>("terminal_write", { id, data }),
+        resize: (id, cols, rows) => invoke<void>("terminal_resize", { id, cols, rows }),
+        close: (id) => invoke<void>("terminal_close", { id }),
+      },
     },
     app: {
       openExternal: (url) =>

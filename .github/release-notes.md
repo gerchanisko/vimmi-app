@@ -2,6 +2,10 @@
 
 Poznámky, úkoly a kalendář na jednom klidném místě – s AI asistentem.
 
+### Novinka ve verzi 0.10: Claude Code přímo ve Vimmi
+
+V pravém panelu je nová karta **Claude Code** (ikona terminálu). Vimmi v ní spustí tvůj Claude Code ve složce s poznámkami. Rovnou s ním mluvíš na svém předplatném Claude Pro / Max a změny poznámek, úkolů a kalendáře hned vidíš vedle. Přihlašuješ se v něm sám, Vimmi do tvého účtu Claude nevidí. Potřebuje nainstalovaný Claude Code. Při prvním spuštění se zeptá, jestli složce důvěřuješ: vyber *Yes, I trust this folder*.
+
 ### Oprava ve verzi 0.9.1
 
 Na Linuxu (instalace přes `install.sh`) se aktualizace z aplikace nepovedla: stahování spadlo a po restartu zůstala stará verze. Opraveno. Kdo má 0.8.x nebo 0.9.0 na Linuxu, aktualizuje se jednou ručně stejným příkazem jako při instalaci: `curl -fsSL https://raw.githubusercontent.com/gerchanisko/vimmi-app/main/install.sh | bash`. Další aktualizace už půjdou samy.

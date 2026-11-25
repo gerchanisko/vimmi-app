@@ -90,6 +90,12 @@ const port = 4444 + Math.floor(Math.random() * 500);
 // On Windows the WebView2 driver (msedgedriver.exe) comes from MSEDGEDRIVER or the current folder.
 const driverArgs = ["--port", String(port)];
 if (win) driverArgs.push("--native-driver", process.env.MSEDGEDRIVER || path.resolve("msedgedriver.exe"));
+// The fake `claude`: shows its arguments, echoes one typed line and quits.
+const fakeClaude = path.join(tmp, "fake-claude");
+if (!win) {
+  fs.writeFileSync(fakeClaude, '#!/bin/sh\necho "FAKE CLAUDE in $(pwd)"\necho "args: $*"\nprintf "> "\nread line\necho "got: $line"\n');
+  fs.chmodSync(fakeClaude, 0o755);
+}
 const driver = spawn(path.join(os.homedir(), ".cargo", "bin", `tauri-driver${win ? ".exe" : ""}`), driverArgs, {
   env: {
     ...process.env,
@@ -99,6 +105,8 @@ const driver = spawn(path.join(os.homedir(), ".cargo", "bin", `tauri-driver${win
     VIMMI_GITHUB_TOKEN: "t",
     VIMMI_GITHUB_API: ghApi.url,
     // Updates: pretend to be an install.sh install, with a fake release feed and installer.
+    // A stand-in for Claude Code in the Claude Code panel (no account needed).
+    ...(win ? {} : { VIMMI_CLAUDE_BIN: fakeClaude }),
     VIMMI_UPDATE_METHOD: "script",
     VIMMI_UPDATE_FEED: `${apiUrl}/release/latest`,
     // The update script must not inherit the AppImage's own environment (its bundled libraries broke
@@ -397,6 +405,24 @@ try {
     await shot("06-claude-mcp");
     await press("Escape");
   });
+
+  if (!win)
+    await step("Claude Code panel: a terminal runs claude with Vimmi's MCP server in the vault", async () => {
+      await click("button[aria-label^='Claude Code']");
+      const screen = () => js("return document.querySelector('.claude-terminal .xterm-rows')?.textContent ?? ''");
+      await until("fake claude started", async () => (await screen()).includes("FAKE CLAUDE"), 15000);
+      const text = await screen();
+      if (!text.includes(vaultDir)) throw new Error(`not started in the vault: ${text.slice(0, 200)}`);
+      if (!text.includes("--mcp-config") || !text.includes("mcpServers")) throw new Error(`no MCP config: ${text.slice(0, 300)}`);
+      await js("document.querySelector('.claude-terminal textarea').focus()");
+      await type("ahoj z Vimmi");
+      await press("Enter");
+      await until("typed line reached claude", async () => (await screen()).includes("got: ahoj z Vimmi"), 10000);
+      await until("exit shown", async () => (await screen()).includes("Claude Code skončil"), 10000);
+      await shot("06b-claude-terminal");
+      await click("button", "Spustit znovu");
+      await until("restarted", async () => (await screen()).includes("FAKE CLAUDE"), 15000);
+    });
 
   await step("settings persist on disk and dark theme switches", async () => {
     await press("Control+,");

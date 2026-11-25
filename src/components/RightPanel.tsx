@@ -1,12 +1,17 @@
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { basename, isoDate } from "../../shared/markdown";
 import { askAi } from "../lib/actions";
 import { activeNotePath, openNote, openView, setState, useApp, type RightPanel as Panel } from "../lib/store";
 import AiChat from "./AiChat";
+
 import { Icon } from "./Icon";
+
+// Loaded only when opened (the terminal library is not needed on the web and phones).
+const ClaudeTerminal = lazy(() => import("./ClaudeTerminal"));
 
 const TABS: { id: Panel; icon: string; label: string }[] = [
   { id: "ai", icon: "sparkle", label: "AI asistent (Ctrl+J)" },
+  { id: "claude", icon: "terminal", label: "Claude Code (tvůj účet Claude)" },
   { id: "links", icon: "link", label: "Odkazy" },
   { id: "outline", icon: "outline", label: "Osnova" },
   { id: "info", icon: "info", label: "Informace" },
@@ -15,14 +20,18 @@ const TABS: { id: Panel; icon: string; label: string }[] = [
 export default function RightPanel() {
   const right = useApp((s) => s.right);
   const [aiMounted, setAiMounted] = useState(right === "ai");
+  const [claudeMounted, setClaudeMounted] = useState(right === "claude");
   useEffect(() => {
     if (right === "ai") setAiMounted(true);
+    if (right === "claude") setClaudeMounted(true);
   }, [right]);
-  if (!right && !aiMounted) return null;
+  if (!right && !aiMounted && !claudeMounted) return null;
+  // Claude Code needs the desktop app (a terminal on this computer).
+  const tabs = window.vimmi.claude?.terminal ? TABS : TABS.filter((t) => t.id !== "claude");
   return (
-    <aside className="right-panel" hidden={!right}>
+    <aside className={`right-panel${right === "claude" ? " wide" : ""}`} hidden={!right}>
       <div className="panel-tabs" role="tablist">
-        {TABS.map((t) => (
+        {tabs.map((t) => (
           <button
             key={t.id}
             role="tab"
@@ -44,6 +53,14 @@ export default function RightPanel() {
       {aiMounted && (
         <div className="panel-body" hidden={right !== "ai"}>
           <AiChat />
+        </div>
+      )}
+      {/* Claude Code keeps running while other tabs are shown or the panel is closed. */}
+      {claudeMounted && window.vimmi.claude?.terminal && (
+        <div className="panel-body" hidden={right !== "claude"}>
+          <Suspense fallback={null}>
+            <ClaudeTerminal visible={right === "claude"} />
+          </Suspense>
         </div>
       )}
       {right === "links" && <LinksPanel />}
