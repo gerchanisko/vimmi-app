@@ -134,17 +134,19 @@ mod tests {
 
     #[test]
     fn a_pseudo_terminal_runs_a_program() {
-        // The same pieces as terminal_open, with a shell instead of Claude Code.
+        // The same pieces as terminal_open, with a shell instead of Claude Code. The program keeps
+        // running a moment: ConPTY (Windows) renders output asynchronously.
         let pair = native_pty_system().openpty(size(80, 24)).unwrap();
         let mut cmd = if cfg!(windows) { CommandBuilder::new("cmd.exe") } else { CommandBuilder::new("sh") };
         if cfg!(windows) {
-            cmd.args(["/C", "echo vimmi-pty-ok"]);
+            cmd.args(["/C", "echo vimmi-pty-ok & ping -n 4 127.0.0.1 >nul"]);
         } else {
-            cmd.args(["-c", "echo vimmi-pty-ok"]);
+            cmd.args(["-c", "echo vimmi-pty-ok; sleep 2"]);
         }
         let mut child = pair.slave.spawn_command(cmd).unwrap();
         drop(pair.slave);
         let mut reader = pair.master.try_clone_reader().unwrap();
+        let mut writer = pair.master.take_writer().unwrap();
         let (tx, rx) = std::sync::mpsc::channel();
         std::thread::spawn(move || {
             let mut all = Vec::new();
@@ -154,13 +156,34 @@ mod tests {
                     break;
                 }
                 all.extend_from_slice(&buf[..n]);
-                if String::from_utf8_lossy(&all).contains("vimmi-pty-ok") {
-                    let _ = tx.send(true);
+                let text = String::from_utf8_lossy(&all).into_owned();
+                // ConPTY asks where the cursor is before it shows anything; a terminal (xterm.js in
+                // the app) answers, so the test does too.
+                if text.contains("\x1b[6n") {
+                    let _ = tx.send(Err(()));
+                }
+                if text.contains("vimmi-pty-ok") {
+                    let _ = tx.send(Ok(()));
                     return;
                 }
             }
         });
-        assert!(rx.recv_timeout(std::time::Duration::from_secs(10)).unwrap_or(false));
-        child.wait().unwrap();
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(15);
+        let mut ok = false;
+        while let Some(left) = deadline.checked_duration_since(std::time::Instant::now()) {
+            match rx.recv_timeout(left) {
+                Ok(Ok(())) => {
+                    ok = true;
+                    break;
+                }
+                Ok(Err(())) => {
+                    let _ = writer.write_all(b"\x1b[1;1R");
+                    let _ = writer.flush();
+                }
+                Err(_) => break,
+            }
+        }
+        let _ = child.kill();
+        assert!(ok, "no output from the program in the pseudo terminal");
     }
 }
