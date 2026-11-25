@@ -3,6 +3,7 @@
 //! runs; this crate replaces the Electron main process (electron/).
 
 mod electron_import;
+mod mcp;
 mod secrets;
 mod vault;
 
@@ -447,7 +448,13 @@ pub fn run() {
         .plugin(tauri_plugin_process::init())
         .manage(AppState::default())
         .setup(|app| {
+            // `vimmi --mcp`: an MCP server for the Claude apps, with a hidden window and no updates.
+            if mcp::requested() {
+                return Ok(mcp::start(app.handle())?);
+            }
             start_log(app.handle());
+            let main = app.config().app.windows.first().cloned().ok_or("no window in tauri.conf.json")?;
+            tauri::WebviewWindowBuilder::from_config(app.handle(), &main)?.build()?;
             Ok(())
         })
         .register_uri_scheme_protocol("vimmi-file", |ctx, req| serve_file(ctx.app_handle(), req.uri().path()))
@@ -481,6 +488,11 @@ pub fn run() {
             private_write,
             private_delete,
             private_list,
+            mcp::mcp_read,
+            mcp::mcp_write,
+            mcp::mcp_setup,
+            mcp::mcp_add_to_claude_code,
+            mcp::mcp_add_to_claude_desktop,
         ])
         .run(tauri::generate_context!())
         .expect("Vimmi se nepodařilo spustit");

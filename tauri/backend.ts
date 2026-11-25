@@ -30,7 +30,7 @@ import { isoDate } from "../shared/markdown";
 import { fallbackProvider, PROVIDER_MAP, PROVIDERS, type ProviderId } from "../shared/providers";
 import { createPrivateRepo, githubUser } from "../shared/sync";
 import { SyncManager } from "../shared/sync-manager";
-import { DEFAULT_SETTINGS, type Settings, type SyncSettings, type UpdateStatus } from "../shared/types";
+import { DEFAULT_SETTINGS, type ClaudeConnectApi, type ClaudeSetup, type Settings, type SyncSettings, type UpdateStatus } from "../shared/types";
 import { Vault } from "../shared/vault";
 import { dailyNote, noteFromTemplate, templatePaths } from "../shared/vault-actions";
 import { CalendarFeed } from "../shared/calendar-feed";
@@ -333,7 +333,7 @@ export async function installBackend(): Promise<void> {
   const on = <T>(event: string, cb: (payload: T) => void) => bus.on<T>(event, cb);
   const wrap = <T>(fn: () => T | Promise<T>): Promise<T> => Promise.resolve().then(fn);
 
-  const api: VimmiApi = {
+  const api: VimmiApi & { claude: ClaudeConnectApi } = {
     settings: {
       get: () => wrap(() => ({ ...settings, keyEncrypted })),
       set: (patch) =>
@@ -502,6 +502,12 @@ export async function installBackend(): Promise<void> {
       stopQuick: (id) => wrap(() => agent.stopQuick(id)),
       onEvent: (cb) => on("ai:event", cb),
       onQuick: (cb) => on("ai:quick-event", cb),
+    },
+    // Vimmi as an MCP server in the user's own Claude apps (src-tauri/src/mcp.rs).
+    claude: {
+      setup: () => invoke<ClaudeSetup>("mcp_setup"),
+      addToClaudeCode: () => invoke<void>("mcp_add_to_claude_code"),
+      addToClaudeDesktop: () => invoke<void>("mcp_add_to_claude_desktop"),
     },
     app: {
       openExternal: (url) =>

@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "mcp",
+  "description": "The hidden window of `vimmi --mcp` (the MCP server for the Claude apps): only its own commands and vault change events.",
+  "windows": ["mcp"],
+  "permissions": ["core:default"]
+}

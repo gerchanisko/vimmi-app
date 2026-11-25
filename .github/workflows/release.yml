@@ -72,6 +72,8 @@ jobs:
       - run: node scripts/build-electron.mjs
       - name: End-to-end test of the desktop app
         run: xvfb-run -a node test/tauri-smoke.mjs
+      - name: MCP server (vimmi --mcp) for the Claude apps
+        run: xvfb-run -a node test/mcp-stdio.mjs
       - name: Upload screenshots
         if: always()
         uses: actions/upload-artifact@v4
@@ -99,7 +101,8 @@ jobs:
       - run: msedgedriver-tool.exe
       - run: npm ci
       - run: cargo test --manifest-path src-tauri/Cargo.toml
-      - run: npx tauri build --debug --no-bundle
+      # Built as a GUI program like the release (no console), so stdio for `vimmi --mcp` is tested as shipped.
+      - run: npx tauri build --debug --no-bundle --features gui
       - run: node scripts/build-electron.mjs
       # The first start after the update from Vimmi 0.7: the app must get all the way to its UI.
       - name: Start like after the update from Vimmi 0.7
@@ -115,6 +118,8 @@ jobs:
           if (-not $p.WaitForExit(90000)) { Stop-Process $p -Force; Get-Content "$t\new\startup.log"; throw "the app did not finish starting within 90 s" }
           Get-Content "$t\new\startup.log"
           if (-not (Select-String -Path "$t\new\startup.log" -Pattern "ui ready" -Quiet)) { throw "the UI did not come up" }
+      - name: MCP server (vimmi --mcp) for the Claude apps
+        run: node test/mcp-stdio.mjs
       - name: End-to-end test of the desktop app
         # WebDriver on Windows CI does not attach to the app yet; the start check above is the gate.
         continue-on-error: true
@@ -210,6 +215,11 @@ jobs:
           Write-Output "Update from 0.7.3 works."
         env:
           GH_TOKEN: ${{ github.token }}
+      # The installed release build has no console (GUI program): Claude Code must still get its stdio.
+      - name: MCP server of the installed app (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: node test/mcp-stdio.mjs "$env:LOCALAPPDATA\Vimmi\vimmi.exe"
       - uses: actions/upload-artifact@v4
         with:
           name: app-${{ runner.os }}
