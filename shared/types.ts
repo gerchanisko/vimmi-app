@@ -298,8 +298,17 @@ export interface ClaudeSetup {
   inClaudeDesktop: boolean;
 }
 
+/** A terminal running the user's own Claude Code (desktop app only). */
+export interface ClaudeTerminalApi {
+  open(cols: number, rows: number, onData: (data: Uint8Array) => void, onExit: (code: number) => void): Promise<number>;
+  write(id: number, data: string): Promise<void>;
+  resize(id: number, cols: number, rows: number): Promise<void>;
+  close(id: number): Promise<void>;
+}
+
 export interface ClaudeConnectApi {
   setup(): Promise<ClaudeSetup>;
+  terminal: ClaudeTerminalApi;
   addToClaudeCode(): Promise<void>;
   addToClaudeDesktop(): Promise<void>;
 }

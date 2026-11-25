@@ -124,6 +124,7 @@ Synchronizuje se automaticky při spuštění, každých 15 sekund a při návra
 
 Máš předplatné Claude? Vimmi se dá připojit do **Claude Code** nebo **Claude Desktop** jako MCP server. Claude pak čte a upravuje tvoje poznámky, úkoly a kalendář a běží to na tvém předplatném, takže nepotřebuješ API klíč.
 
+- **Přímo ve Vimmi: panel Claude Code** (ikona terminálu v pravém panelu). Vimmi v něm spustí tvůj nainstalovaný Claude Code ve složce trezoru, s nástroji Vimmi. Přihlašuješ se v něm sám svým účtem Claude a Vimmi do něj nevidí, je to jen terminál. Při prvním spuštění se Claude Code zeptá, jestli složce trezoru důvěřuješ: vyber *Yes, I trust this folder*. Potřebuje nainstalovaný Claude Code (`claude`).
 - V aplikaci: **Nastavení → AI → Claude Pro / Max přes MCP** → *Přidat do Claude Code* nebo *Přidat do Claude Desktop* (Claude Desktop je pak potřeba restartovat).
 - Ručně v terminálu (Linux s install.sh; na Windows je cesta `%LOCALAPPDATA%\Vimmi\vimmi.exe`):
   ```bash

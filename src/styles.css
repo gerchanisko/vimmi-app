@@ -1385,6 +1385,33 @@ label.check {
   background: var(--surface-2);
   min-height: 0;
 }
+.right-panel.wide {
+  width: min(680px, 52vw);
+}
+.claude-terminal {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+.claude-terminal-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+}
+.claude-terminal-screen {
+  flex: 1;
+  min-height: 0;
+  padding: 6px 0 6px 8px;
+}
+.claude-terminal-screen .xterm {
+  height: 100%;
+}
+.claude-terminal-note {
+  padding: 16px;
+}
 .panel-tabs {
   display: flex;
   align-items: center;

@@ -74,7 +74,7 @@ pub struct McpSetup {
 }
 
 /// The program the Claude apps should start: a path that survives updates.
-fn server_command() -> Result<String, String> {
+pub(crate) fn server_command() -> Result<String, String> {
     // An AppImage run directly: the file itself (the running binary lives in a temporary mount).
     if let Ok(img) = std::env::var("APPIMAGE") {
         if !img.is_empty() {
@@ -121,7 +121,13 @@ fn claude_desktop_dir() -> Option<PathBuf> {
 
 /// The Claude Code program: on PATH, or where its installers put it (a menu-started app may not
 /// have ~/.local/bin on PATH).
-fn claude_code() -> Option<PathBuf> {
+pub(crate) fn claude_code() -> Option<PathBuf> {
+    // Tests use a stand-in (development builds only).
+    if cfg!(debug_assertions) {
+        if let Some(fake) = std::env::var_os("VIMMI_CLAUDE_BIN") {
+            return Some(PathBuf::from(fake));
+        }
+    }
     let exe = if cfg!(windows) { "claude.exe" } else { "claude" };
     let mut dirs_: Vec<PathBuf> = std::env::var_os("PATH").map(|p| std::env::split_paths(&p).collect()).unwrap_or_default();
     if let Some(home) = dirs::home_dir() {

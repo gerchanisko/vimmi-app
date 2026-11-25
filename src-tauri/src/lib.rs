@@ -5,6 +5,7 @@
 mod electron_import;
 mod mcp;
 mod secrets;
+mod terminal;
 mod vault;
 
 use std::path::PathBuf;
@@ -19,7 +20,7 @@ use tauri::{AppHandle, Emitter, Manager, State};
 use vault::{FileStat, Listing};
 
 #[derive(Default)]
-struct AppState {
+pub(crate) struct AppState {
     root: Mutex<Option<PathBuf>>,
     watcher: Mutex<Option<notify::RecommendedWatcher>>,
     /** A found update and, once downloaded and verified, its bytes. */
@@ -27,7 +28,7 @@ struct AppState {
 }
 
 impl AppState {
-    fn root(&self) -> Result<PathBuf, String> {
+    pub(crate) fn root(&self) -> Result<PathBuf, String> {
         self.root.lock().unwrap().clone().ok_or_else(|| "Není otevřený žádný trezor.".to_string())
     }
     fn file(&self, rel: &str) -> Result<PathBuf, String> {
@@ -176,7 +177,7 @@ const APPIMAGE_VARS: [&str; 20] = [
 
 /// The environment changes for a program started from inside the AppImage: variables to remove
 /// (None) and lists to set without the AppImage's own folders. Nothing outside an AppImage.
-fn host_env(vars: &[(String, String)]) -> Vec<(String, Option<String>)> {
+pub(crate) fn host_env(vars: &[(String, String)]) -> Vec<(String, Option<String>)> {
     let Some(appdir) = vars.iter().find(|(k, _)| k == "APPDIR").map(|(_, v)| v.trim_end_matches('/').to_string()) else {
         return Vec::new();
     };
@@ -488,6 +489,7 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .manage(AppState::default())
+        .manage(terminal::Terminals::default())
         .setup(|app| {
             // `vimmi --mcp`: an MCP server for the Claude apps, with a hidden window and no updates.
             if mcp::requested() {
@@ -534,6 +536,10 @@ pub fn run() {
             mcp::mcp_setup,
             mcp::mcp_add_to_claude_code,
             mcp::mcp_add_to_claude_desktop,
+            terminal::terminal_open,
+            terminal::terminal_write,
+            terminal::terminal_resize,
+            terminal::terminal_close,
         ])
         .run(tauri::generate_context!())
         .expect("Vimmi se nepodařilo spustit");
