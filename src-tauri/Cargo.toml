@@ -1,6 +1,6 @@
 [package]
 name = "vimmi"
-version = "0.8.1"
+version = "0.9.0"
 description = "Vimmi – poznámky, úkoly a kalendář s AI"
 edition = "2021"
 license = "GPL-3.0-or-later"
@@ -9,6 +9,10 @@ publish = false
 [lib]
 name = "vimmi_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
+
+[features]
+# Windows: build as a GUI program (no console) like the release, for tests.
+gui = []
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
@@ -31,6 +35,8 @@ mime_guess = "2"
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 dirs = "6"
 url = "2"
+# The MCP server's stdin queue.
+tokio = { version = "1", features = ["sync"] }
 # Reading the keys the Electron app (0.7.x) saved, once, after the update.
 aes = "0.8"
 cbc = { version = "0.1", features = ["alloc"] }

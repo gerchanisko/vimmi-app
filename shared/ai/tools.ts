@@ -44,6 +44,14 @@ function def<S extends z.ZodType>(d: ToolDef<S>): ToolDef<S> {
   return d;
 }
 
+/** How notes, tasks, projects and the calendar are written: shared by the in-app AI and the MCP server. */
+export const VAULT_GUIDE = `How the vault works:
+- Notes link to each other with [[Note title]] wikilinks ([[Note|alias]] and [[Note#Heading]] also work) and use #tags.
+- Tasks are Markdown checkboxes: "- [ ] text". A due date is written as @YYYY-MM-DD and priority as !1 (high), !2 or !3. Done tasks are "- [x]".
+- A project is a note with "type: project" in its YAML frontmatter. Other notes and their tasks belong to a project via "project: Project name" in frontmatter, and tasks inside the project note belong to it too.
+- Daily journal notes are named YYYY-MM-DD.
+- The calendar holds events (appointments, meetings, birthdays, trips). Use the calendar tools for them: add_event when the user mentions something happening at a date or time ("tomorrow I have the doctor at 10"), list_events to see what is planned. Work out dates from today's date in the <context> block (Czech weekdays: pondělí, úterý, středa, čtvrtek, pátek, sobota, neděle). If no time is given, make it an all-day event rather than inventing a time. Events are different from tasks: a task is something to do, an event happens at a time. Events marked "jen pro čtení" come from a subscribed calendar (e.g. Google Calendar): you can read them but not change or delete them – tell the user to change them in that calendar.`;
+
 const MAX_READ = 80_000;
 const priority = z.union([z.literal(1), z.literal(2), z.literal(3)]);
 

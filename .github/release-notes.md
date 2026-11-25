@@ -2,6 +2,10 @@
 
 Poznámky, úkoly a kalendář na jednom klidném místě – s AI asistentem.
 
+### Novinka ve verzi 0.9: Claude Pro / Max bez API klíče
+
+Máš předplatné Claude? V **Nastavení → AI** jedním tlačítkem připojíš Vimmi do **Claude Code** nebo **Claude Desktop** (jako MCP server). Claude pak pracuje s tvými poznámkami, úkoly a kalendářem na tvém předplatném, bez API klíče. Každá změna se ukládá do historie poznámky. AI přímo ve Vimmi funguje dál jako dřív.
+
 ### Oprava ve verzi 0.8.1
 
 Na Windows se verze 0.8.0 po spuštění zasekla a ukazovala jen prázdné okno. Opraveno. Okno teď během startu ukazuje, co se děje, a postup startu se zapisuje do `startup.log` ve složce nastavení (`%APPDATA%\io.github.gerchanisko.vimmi` na Windows, `~/.config/io.github.gerchanisko.vimmi` na Linuxu).

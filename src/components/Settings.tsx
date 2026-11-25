@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { PROVIDER_MAP, PROVIDERS, providerBaseUrl, providerModel, type ProviderId } from "../../shared/providers";
-import type { Effort, Settings as S } from "../../shared/types";
+import type { ClaudeSetup, Effort, Settings as S } from "../../shared/types";
 import { switchVault } from "../lib/actions";
 import { COMMANDS } from "../lib/commands";
 import { errorText, setState, toast, useApp } from "../lib/store";
@@ -171,6 +171,7 @@ export default function Settings({ initialTab }: { initialTab?: string }) {
                 })}
               </div>
               <ProviderSettings key={settings.provider} provider={settings.provider} settings={settings} update={update} />
+              {window.vimmi.claude && <ClaudeConnect />}
 
               <h4 className="settings-sub">Chování</h4>
               <Row label="Úsilí v chatu" hint="Kolik model přemýšlí, než odpoví. Vyšší = kvalitnější, ale pomalejší a dražší. (Claude a OpenAI)">
@@ -475,6 +476,62 @@ function ProviderSettings({
         </div>
       </Row>
     </div>
+  );
+}
+
+/** Vimmi as an MCP server: Claude Code / Claude Desktop work with the notes on the user's own Claude plan. */
+function ClaudeConnect() {
+  const [setup, setSetup] = useState<ClaudeSetup | null>(null);
+  const [busy, setBusy] = useState<"code" | "desktop" | null>(null);
+  const load = () => void window.vimmi.claude!.setup().then(setSetup, () => setSetup(null));
+  useEffect(load, []);
+  const add = async (target: "code" | "desktop") => {
+    setBusy(target);
+    try {
+      if (target === "code") await window.vimmi.claude!.addToClaudeCode();
+      else await window.vimmi.claude!.addToClaudeDesktop();
+      toast(target === "code" ? "Vimmi je v Claude Code. Spusť nový chat (claude) a zeptej se třeba na své úkoly." : "Vimmi je v Claude Desktop. Restartuj Claude Desktop, aby ho načetl.", "ok");
+      load();
+    } catch (err) {
+      toast(errorText(err), "error");
+    } finally {
+      setBusy(null);
+    }
+  };
+  if (!setup) return null;
+  return (
+    <>
+      <h4 className="settings-sub">Claude Pro / Max přes MCP</h4>
+      <p className="muted small">
+        Máš předplatné Claude? Připoj Vimmi do Claude Code nebo Claude Desktop. Claude pak čte a upravuje tvoje poznámky, úkoly a kalendář na tvém
+        předplatném, bez API klíče. Každá změna se ukládá do historie poznámky. AI přímo ve Vimmi dál používá klíč výše.
+      </p>
+      <div className="row-actions">
+        <button className="btn" disabled={!setup.claudeCodeFound || busy !== null} onClick={() => void add("code")} title={setup.claudeCodeFound ? undefined : "Claude Code tady není nainstalovaný"}>
+          {busy === "code" ? <Icon name="spinner" size={14} className="spin" /> : <Icon name="sparkle" size={14} />} Přidat do Claude Code
+        </button>
+        {setup.claudeDesktopConfig && (
+          <button className="btn" disabled={busy !== null} onClick={() => void add("desktop")}>
+            {busy === "desktop" ? <Icon name="spinner" size={14} className="spin" /> : <Icon name="sparkle" size={14} />}{" "}
+            {setup.inClaudeDesktop ? "Znovu přidat do Claude Desktop" : "Přidat do Claude Desktop"}
+          </button>
+        )}
+        {setup.inClaudeDesktop && (
+          <span className="pill ok">
+            <Icon name="ok" size={12} /> v Claude Desktop
+          </span>
+        )}
+      </div>
+      <div className="feed-box" style={{ marginTop: 10 }}>
+        <div className="feed-link">
+          <input readOnly value={setup.claudeCodeLine} onFocus={(e) => e.currentTarget.select()} aria-label="Příkaz pro Claude Code" />
+          <button className="btn small" onClick={() => void navigator.clipboard.writeText(setup.claudeCodeLine).then(() => toast("Příkaz zkopírován.", "ok"))}>
+            <Icon name="copy" size={13} /> Kopírovat
+          </button>
+        </div>
+        <p className="muted small">Příkaz pro terminál, kdyby tlačítko nešlo. Jiné MCP aplikaci zadej program výše s parametrem --mcp.</p>
+      </div>
+    </>
   );
 }
 

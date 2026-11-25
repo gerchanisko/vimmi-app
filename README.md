@@ -120,6 +120,19 @@ Synchronizuje se automaticky při spuštění, každých 15 sekund a při návra
 - Nástroje AI jsou v [`shared/ai/tools.ts`](shared/ai/tools.ts) a sdílí je všichni poskytovatelé. Nový nástroj přidáš jedním záznamem `def({...})` se schématem v Zodu; u zapisujících nastavíš `write: true` a `preview`, aby šly schválit.
 - Smyčky: Claude v [`shared/ai/agent.ts`](shared/ai/agent.ts), ostatní v [`shared/ai/openai-loops.ts`](shared/ai/openai-loops.ts). Když v rozběhnutém chatu změníš poskytovatele, konverzace se převezme jako text.
 
+## Claude Pro / Max přes MCP (bez API klíče)
+
+Máš předplatné Claude? Vimmi se dá připojit do **Claude Code** nebo **Claude Desktop** jako MCP server. Claude pak čte a upravuje tvoje poznámky, úkoly a kalendář a běží to na tvém předplatném, takže nepotřebuješ API klíč.
+
+- V aplikaci: **Nastavení → AI → Claude Pro / Max přes MCP** → *Přidat do Claude Code* nebo *Přidat do Claude Desktop* (Claude Desktop je pak potřeba restartovat).
+- Ručně v terminálu (Linux s install.sh; na Windows je cesta `%LOCALAPPDATA%\Vimmi\vimmi.exe`):
+  ```bash
+  claude mcp add --scope user vimmi -- ~/.local/opt/vimmi/vimmi --mcp
+  ```
+- Jiný MCP klient: program Vimmi s parametrem `--mcp` (stdio).
+
+Claude dostane stejné nástroje jako AI ve Vimmi (hledání, čtení, úpravy poznámek, úkoly, projekty, kalendář) a pracuje s trezorem, který máš ve Vimmi otevřený. Vimmi nemusí běžet. Každá změna se uloží do historie poznámky, takže jde vrátit. Na zápis se Claude Code ptá podle svého nastavení oprávnění. Vimmi se k tvému účtu Claude nepřihlašuje a nic od něj neukládá: Claude spouští Vimmi, ne naopak. AI přímo ve Vimmi dál používá API klíč. Protokol je v [`shared/ai/mcp.ts`](shared/ai/mcp.ts), spuštění v [`src-tauri/src/mcp.rs`](src-tauri/src/mcp.rs).
+
 ## Vývoj
 
 Potřebuješ Node.js 22+ a Rust (stable). Na Linuxu ještě WebKitGTK 4.1 (`webkit2gtk-4.1` na Archu, `libwebkit2gtk-4.1-dev` na Ubuntu); pro end-to-end test `tauri-driver` (`cargo install tauri-driver`) a WebKitWebDriver.
@@ -132,6 +145,7 @@ npm run build:web     # webová aplikace (PWA) do dist-web/
 npm test              # unit testy (parser, trezor, AI nástroje)
 cargo test --manifest-path src-tauri/Cargo.toml   # testy Rustu (soubory, klíče, převzetí z Vimmi 0.7)
 npm run desktop:test  # end-to-end test aplikace přes WebDriver: funkce, AI, synchronizace, aktualizace
+node test/mcp-stdio.mjs  # MCP server (vimmi --mcp) přes stdin/stdout jako z Claude Code
 npm run sync-e2e      # end-to-end test synchronizace: počítač ↔ telefon (webová verze) přes falešný GitHub
 npm run desktop:build # instalátor / AppImage do src-tauri/target/release/bundle/
 ```

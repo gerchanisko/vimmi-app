@@ -285,3 +285,21 @@ export interface CalendarSubscriptionStatus {
   busy?: boolean;
 }
 
+
+/** How to connect Vimmi to the Claude apps as an MCP server (desktop app only). */
+export interface ClaudeSetup {
+  command: string;
+  args: string[];
+  /** The line for a terminal: adds Vimmi to Claude Code. */
+  claudeCodeLine: string;
+  claudeCodeFound: boolean;
+  /** Claude Desktop's config file, when Claude Desktop is installed. */
+  claudeDesktopConfig: string | null;
+  inClaudeDesktop: boolean;
+}
+
+export interface ClaudeConnectApi {
+  setup(): Promise<ClaudeSetup>;
+  addToClaudeCode(): Promise<void>;
+  addToClaudeDesktop(): Promise<void>;
+}

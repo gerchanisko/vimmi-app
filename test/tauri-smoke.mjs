@@ -383,6 +383,18 @@ try {
     }
   });
 
+  await step("AI settings offer Vimmi as an MCP server for the Claude apps", async () => {
+    await press("Control+,");
+    await click(".settings-nav *", "AI");
+    await until("Claude MCP section", () => js("return [...document.querySelectorAll('.settings-sub')].some((e) => e.textContent.includes('MCP'))"), 10000);
+    const line = await js("return document.querySelector(\"input[aria-label='Příkaz pro Claude Code']\")?.value ?? ''");
+    if (!/^claude mcp add --scope user vimmi -- .*vimmi(\.exe)?"? --mcp$/.test(line)) throw new Error(`unexpected command: ${line}`);
+    await js("document.querySelector(\"input[aria-label='Příkaz pro Claude Code']\").scrollIntoView({ block: 'end', behavior: 'instant' })");
+    await sleep(400);
+    await shot("06-claude-mcp");
+    await press("Escape");
+  });
+
   await step("settings persist on disk and dark theme switches", async () => {
     await press("Control+,");
     await click(".settings-nav *", "Obecné");

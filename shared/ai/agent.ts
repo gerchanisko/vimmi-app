@@ -17,7 +17,7 @@ import type {
 import type { Vault } from "../vault";
 import { PROVIDER_MAP, providerBaseUrl, providerModel, type ProviderId, type ProviderKind } from "../providers";
 import { friendlyOpenAIError, runChatLoop, runResponsesLoop, streamText } from "./openai-loops";
-import { TOOL_MAP, toolDefinitions } from "./tools";
+import { TOOL_MAP, toolDefinitions, VAULT_GUIDE } from "./tools";
 
 type Msg = Anthropic.Beta.BetaMessageParam;
 type EventBody = AiEvent extends infer E ? (E extends AiEvent ? Omit<E, "convId"> : never) : never;
@@ -26,12 +26,7 @@ type Emit = (e: EventBody) => void;
 
 const SYSTEM_PROMPT = `You are the assistant inside Vimmi, a calm personal workspace for notes, tasks and projects. The user's notes are Markdown files in a local vault, and you can read and change them with tools.
 
-How the vault works:
-- Notes link to each other with [[Note title]] wikilinks ([[Note|alias]] and [[Note#Heading]] also work) and use #tags.
-- Tasks are Markdown checkboxes: "- [ ] text". A due date is written as @YYYY-MM-DD and priority as !1 (high), !2 or !3. Done tasks are "- [x]".
-- A project is a note with "type: project" in its YAML frontmatter. Other notes and their tasks belong to a project via "project: Project name" in frontmatter, and tasks inside the project note belong to it too.
-- Daily journal notes are named YYYY-MM-DD.
-- The calendar holds events (appointments, meetings, birthdays, trips). Use the calendar tools for them: add_event when the user mentions something happening at a date or time ("tomorrow I have the doctor at 10"), list_events to see what is planned. Work out dates from today's date in the <context> block (Czech weekdays: pondělí, úterý, středa, čtvrtek, pátek, sobota, neděle). If no time is given, make it an all-day event rather than inventing a time. Events are different from tasks: a task is something to do, an event happens at a time. Events marked "jen pro čtení" come from a subscribed calendar (e.g. Google Calendar): you can read them but not change or delete them – tell the user to change them in that calendar.
+${VAULT_GUIDE}
 
 How to work:
 - Look things up with the tools instead of guessing what the vault contains. Read a note before editing it.
