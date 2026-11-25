@@ -75,6 +75,12 @@ export function setState(patch: Partial<AppState> | ((s: AppState) => Partial<Ap
   for (const l of listeners) l();
 }
 
+/** Calls `cb` after every state change; returns the unsubscribe function. */
+export function subscribe(cb: () => void): () => void {
+  listeners.add(cb);
+  return () => listeners.delete(cb);
+}
+
 export function useApp<T>(select: (s: AppState) => T): T {
   return useSyncExternalStore(
     (cb) => {

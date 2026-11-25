@@ -32,6 +32,10 @@ pub fn start(app: &AppHandle) -> tauri::Result<()> {
                 break;
             }
         }
+        // The client closed stdin: the window answers what is still in progress, then calls
+        // mcp_done; this is the fallback if it never does.
+        drop(tx);
+        std::thread::sleep(std::time::Duration::from_secs(30));
         handle.exit(0);
     });
     // Its own browser data, so it never collides with an open Vimmi window.
@@ -50,11 +54,50 @@ pub async fn mcp_read(input: State<'_, McpInput>) -> Result<Option<String>, Stri
     Ok(input.0.lock().await.recv().await)
 }
 
+/// All replies are out after the client closed stdin: the server ends.
+#[tauri::command]
+pub fn mcp_done(app: AppHandle) {
+    app.exit(0);
+}
+
 /// One message to the client (a JSON-RPC line; stdout carries nothing else).
 #[tauri::command]
 pub fn mcp_write(line: String) -> Result<(), String> {
     let mut out = std::io::stdout().lock();
     writeln!(out, "{}", line.replace(['\r', '\n'], " ")).and_then(|_| out.flush()).map_err(|e| e.to_string())
+}
+
+// ---------- what is open in Vimmi ----------
+
+/// The open note and selection, written by the app window and read by `vimmi --mcp` (get_open_note).
+fn open_note_file(app: &AppHandle) -> Result<PathBuf, String> {
+    Ok(crate::config_dir(app)?.join("open-note.json"))
+}
+
+#[tauri::command]
+pub fn claude_context_set(app: AppHandle, json: Option<String>) -> Result<(), String> {
+    let file = open_note_file(&app)?;
+    match json {
+        Some(json) => {
+            std::fs::create_dir_all(file.parent().unwrap()).map_err(|e| e.to_string())?;
+            crate::vault::atomic_write(&file, json.as_bytes()).map(|_| ())
+        }
+        None => {
+            let _ = std::fs::remove_file(&file);
+            Ok(())
+        }
+    }
+}
+
+/// The context JSON with `age_s` (seconds since Vimmi wrote it), or None when Vimmi is not open.
+#[tauri::command]
+pub fn claude_context_get(app: AppHandle) -> Option<String> {
+    let file = open_note_file(&app).ok()?;
+    let json = std::fs::read_to_string(&file).ok()?;
+    let mut value: serde_json::Value = serde_json::from_str(&json).ok()?;
+    let age = std::fs::metadata(&file).ok()?.modified().ok()?.elapsed().map(|d| d.as_secs()).unwrap_or(0);
+    value.as_object_mut()?.insert("age_s".into(), age.into());
+    Some(value.to_string())
 }
 
 // ---------- setting Vimmi up in Claude ----------

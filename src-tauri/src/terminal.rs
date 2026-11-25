@@ -25,7 +25,7 @@ pub struct Terminals {
 }
 
 /// What Claude is told about where it runs (added to Claude Code's own system prompt).
-const CONTEXT: &str = "You run inside Vimmi, the user's notes app, in its Claude Code panel. The user's notes, tasks, projects and calendar are in their Vimmi vault: use the vimmi tools (mcp__vimmi__*) for them; changes show up in Vimmi right away. Reply in the user's language (usually Czech).";
+const CONTEXT: &str = "You run inside Vimmi, the user's notes app, in its Claude Code panel. The user's notes, tasks, projects and calendar are in their Vimmi vault: use the vimmi tools (mcp__vimmi__*) for them; changes show up in Vimmi right away. When the user means the note they are looking at (\"this note\", \"tahle poznámka\", \"tady\"), call get_open_note. Reply in the user's language (usually Czech).";
 
 fn size(cols: u16, rows: u16) -> PtySize {
     PtySize { cols: cols.clamp(20, 500), rows: rows.clamp(5, 300), pixel_width: 0, pixel_height: 0 }

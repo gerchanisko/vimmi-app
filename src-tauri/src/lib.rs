@@ -79,7 +79,7 @@ fn env_info(app: AppHandle) -> EnvInfo {
     }
 }
 
-fn config_dir(app: &AppHandle) -> Res<PathBuf> {
+pub(crate) fn config_dir(app: &AppHandle) -> Res<PathBuf> {
     if let Ok(dir) = std::env::var("VIMMI_USER_DATA") {
         return Ok(PathBuf::from(dir));
     }
@@ -533,9 +533,12 @@ pub fn run() {
             private_list,
             mcp::mcp_read,
             mcp::mcp_write,
+            mcp::mcp_done,
             mcp::mcp_setup,
             mcp::mcp_add_to_claude_code,
             mcp::mcp_add_to_claude_desktop,
+            mcp::claude_context_set,
+            mcp::claude_context_get,
             terminal::terminal_open,
             terminal::terminal_write,
             terminal::terminal_resize,

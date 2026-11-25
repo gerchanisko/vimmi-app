@@ -1,7 +1,7 @@
 // The hidden window of `vimmi --mcp`: answers MCP messages from Claude Code / Claude Desktop with the
 // vault tools (shared/ai/mcp.ts). Rust passes stdin lines in (mcp_read) and replies out (mcp_write).
 import { invoke } from "@tauri-apps/api/core";
-import { createMcpServer } from "../shared/ai/mcp";
+import { createMcpServer, type OpenContext } from "../shared/ai/mcp";
 import type { ToolEnv } from "../shared/ai/tools";
 import { DEFAULT_SETTINGS, type Settings } from "../shared/types";
 import { Vault } from "../shared/vault";
@@ -31,13 +31,24 @@ const server = createMcpServer({
       env = undefined;
       throw err;
     })),
+  // What the Vimmi window has open (null when Vimmi is not running).
+  openContext: async () => {
+    const json = await invoke<string | null>("claude_context_get");
+    return json ? (JSON.parse(json) as OpenContext) : null;
+  },
 });
 
+const inFlight = new Set<Promise<unknown>>();
 for (;;) {
   const line = await invoke<string | null>("mcp_read");
   if (line === null) break;
-  void server
+  const job = server
     .handleLine(line)
     .then((reply) => reply && invoke("mcp_write", { line: reply }))
     .catch((err: unknown) => console.error(err));
+  inFlight.add(job);
+  void job.finally(() => inFlight.delete(job));
 }
+// The client closed stdin: finish the answers still in progress, then end.
+await Promise.allSettled([...inFlight]);
+await invoke("mcp_done");

@@ -132,7 +132,7 @@ Máš předplatné Claude? Vimmi se dá připojit do **Claude Code** nebo **Clau
   ```
 - Jiný MCP klient: program Vimmi s parametrem `--mcp` (stdio).
 
-Claude dostane stejné nástroje jako AI ve Vimmi (hledání, čtení, úpravy poznámek, úkoly, projekty, kalendář) a pracuje s trezorem, který máš ve Vimmi otevřený. Vimmi nemusí běžet. Každá změna se uloží do historie poznámky, takže jde vrátit. Na zápis se Claude Code ptá podle svého nastavení oprávnění. Vimmi se k tvému účtu Claude nepřihlašuje a nic od něj neukládá: Claude spouští Vimmi, ne naopak. AI přímo ve Vimmi dál používá API klíč. Protokol je v [`shared/ai/mcp.ts`](shared/ai/mcp.ts), spuštění v [`src-tauri/src/mcp.rs`](src-tauri/src/mcp.rs).
+Claude navíc pozná, kterou poznámku máš ve Vimmi otevřenou a co v ní máš označené (nástroj `get_open_note`; Vimmi to zapisuje do `open-note.json` ve složce nastavení a při zavření ho smaže). Claude dostane stejné nástroje jako AI ve Vimmi (hledání, čtení, úpravy poznámek, úkoly, projekty, kalendář) a pracuje s trezorem, který máš ve Vimmi otevřený. Vimmi nemusí běžet. Každá změna se uloží do historie poznámky, takže jde vrátit. Na zápis se Claude Code ptá podle svého nastavení oprávnění. Vimmi se k tvému účtu Claude nepřihlašuje a nic od něj neukládá: Claude spouští Vimmi, ne naopak. AI přímo ve Vimmi dál používá API klíč. Protokol je v [`shared/ai/mcp.ts`](shared/ai/mcp.ts), spuštění v [`src-tauri/src/mcp.rs`](src-tauri/src/mcp.rs).
 
 ## Vývoj
 

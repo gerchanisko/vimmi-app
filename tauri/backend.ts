@@ -508,6 +508,7 @@ export async function installBackend(): Promise<void> {
       setup: () => invoke<ClaudeSetup>("mcp_setup"),
       addToClaudeCode: () => invoke<void>("mcp_add_to_claude_code"),
       addToClaudeDesktop: () => invoke<void>("mcp_add_to_claude_desktop"),
+      setOpenNote: (json) => invoke<void>("claude_context_set", { json }),
       // The Claude Code panel (src-tauri/src/terminal.rs): output arrives as raw bytes.
       terminal: {
         open: (cols, rows, onData, onExit) => {
