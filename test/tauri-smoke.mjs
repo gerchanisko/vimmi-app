@@ -420,7 +420,7 @@ try {
       ]
         .map((m) => JSON.stringify(m))
         .join("\n") + "\n",
-      timeout: 30000,
+      timeout: 90000,
       encoding: "utf8",
     });
     const reply = out.split("\n").filter(Boolean).map((l) => JSON.parse(l)).find((m) => m.id === 2);

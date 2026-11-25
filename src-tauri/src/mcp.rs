@@ -35,7 +35,7 @@ pub fn start(app: &AppHandle) -> tauri::Result<()> {
         // The client closed stdin: the window answers what is still in progress, then calls
         // mcp_done; this is the fallback if it never does.
         drop(tx);
-        std::thread::sleep(std::time::Duration::from_secs(30));
+        std::thread::sleep(std::time::Duration::from_secs(120));
         handle.exit(0);
     });
     // Its own browser data, so it never collides with an open Vimmi window.

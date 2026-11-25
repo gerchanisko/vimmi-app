@@ -481,6 +481,11 @@ fn start_log(app: &AppHandle) {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // The hidden window of `vimmi --mcp` needs no accessibility bridge; without an accessibility bus
+    // (some systems, CI) GTK would wait for it about half a minute before the server answers.
+    if mcp::requested() {
+        std::env::set_var("NO_AT_BRIDGE", "1");
+    }
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
