@@ -165,6 +165,47 @@ fn update_method() -> &'static str {
     }
 }
 
+/// Variables the AppImage runtime (AppRun and its GTK hook) sets for Vimmi itself. Programs Vimmi
+/// starts (the update script and its curl, Claude Code) must not inherit them: with the bundled
+/// libraries first on LD_LIBRARY_PATH, the system's curl fails ("symbol lookup error").
+const APPIMAGE_VARS: [&str; 20] = [
+    "LD_LIBRARY_PATH", "LD_PRELOAD", "PYTHONPATH", "QT_PLUGIN_PATH", "GST_PLUGIN_SYSTEM_PATH", "GST_PLUGIN_SYSTEM_PATH_1_0",
+    "GTK_DATA_PREFIX", "GTK_THEME", "GTK_EXE_PREFIX", "GTK_PATH", "GTK_IM_MODULE_FILE", "GDK_PIXBUF_MODULE_FILE",
+    "GSETTINGS_SCHEMA_DIR", "GI_TYPELIB_PATH", "GIO_MODULE_DIR", "GIO_EXTRA_MODULES", "APPDIR", "APPIMAGE", "ARGV0", "OWD",
+];
+
+/// The environment changes for a program started from inside the AppImage: variables to remove
+/// (None) and lists to set without the AppImage's own folders. Nothing outside an AppImage.
+fn host_env(vars: &[(String, String)]) -> Vec<(String, Option<String>)> {
+    let Some(appdir) = vars.iter().find(|(k, _)| k == "APPDIR").map(|(_, v)| v.trim_end_matches('/').to_string()) else {
+        return Vec::new();
+    };
+    if appdir.is_empty() {
+        return Vec::new();
+    }
+    let mut out: Vec<(String, Option<String>)> = APPIMAGE_VARS.iter().map(|k| (k.to_string(), None)).collect();
+    for name in ["PATH", "XDG_DATA_DIRS"] {
+        if let Some((_, v)) = vars.iter().find(|(k, _)| k == name) {
+            let kept: Vec<&str> = v.split(':').filter(|p| !p.is_empty() && !p.starts_with(&appdir)).collect();
+            out.push((name.to_string(), Some(kept.join(":"))));
+        }
+    }
+    out
+}
+
+/// A command for a program of the user's system, without the AppImage's environment.
+pub(crate) fn host_command(program: impl AsRef<std::ffi::OsStr>) -> std::process::Command {
+    let mut cmd = std::process::Command::new(program);
+    let vars: Vec<(String, String)> = std::env::vars().collect();
+    for (k, v) in host_env(&vars) {
+        match v {
+            Some(v) => cmd.env(k, v),
+            None => cmd.env_remove(k),
+        };
+    }
+    cmd
+}
+
 /// The updater; development builds may point it at a test server, key and file (never release builds).
 fn updater(app: &AppHandle) -> Res<tauri_plugin_updater::Updater> {
     use tauri_plugin_updater::UpdaterExt;
@@ -238,7 +279,7 @@ async fn run_install_script(version: String) -> Res<()> {
     tauri::async_runtime::spawn_blocking(move || {
         std::fs::create_dir_all(log_file.parent().unwrap()).map_err(|e| e.to_string())?;
         let log = std::fs::File::create(&log_file).map_err(|e| e.to_string())?;
-        let status = std::process::Command::new("bash")
+        let status = host_command("bash")
             .args(["-c", &command])
             .env("VIMMI_NONINTERACTIVE", "1")
             .env("VIMMI_BRANCH", &tag)
@@ -496,4 +537,37 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("Vimmi se nepodařilo spustit");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::host_env;
+
+    fn vars(list: &[(&str, &str)]) -> Vec<(String, String)> {
+        list.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect()
+    }
+
+    #[test]
+    fn programs_started_from_the_appimage_get_the_system_environment() {
+        let app = "/home/u/.local/opt/vimmi/app";
+        let env = vars(&[
+            ("APPDIR", app),
+            ("LD_LIBRARY_PATH", "/home/u/.local/opt/vimmi/app/usr/lib/:/home/u/.local/opt/vimmi/app/lib/"),
+            ("PATH", "/home/u/.local/opt/vimmi/app/usr/bin/:/home/u/.local/bin:/usr/bin"),
+            ("XDG_DATA_DIRS", "/home/u/.local/opt/vimmi/app/usr/share:/usr/share"),
+            ("HOME", "/home/u"),
+        ]);
+        let fixes = host_env(&env);
+        let get = |k: &str| fixes.iter().find(|(n, _)| n == k).map(|(_, v)| v.clone());
+        assert_eq!(get("LD_LIBRARY_PATH"), Some(None));
+        assert_eq!(get("APPDIR"), Some(None));
+        assert_eq!(get("PATH"), Some(Some("/home/u/.local/bin:/usr/bin".into())));
+        assert_eq!(get("XDG_DATA_DIRS"), Some(Some("/usr/share".into())));
+        assert_eq!(get("HOME"), None);
+    }
+
+    #[test]
+    fn outside_an_appimage_nothing_changes() {
+        assert!(host_env(&vars(&[("LD_LIBRARY_PATH", "/opt/x"), ("PATH", "/usr/bin")])).is_empty());
+    }
 }
