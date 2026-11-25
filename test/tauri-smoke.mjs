@@ -101,7 +101,10 @@ const driver = spawn(path.join(os.homedir(), ".cargo", "bin", `tauri-driver${win
     // Updates: pretend to be an install.sh install, with a fake release feed and installer.
     VIMMI_UPDATE_METHOD: "script",
     VIMMI_UPDATE_FEED: `${apiUrl}/release/latest`,
-    VIMMI_UPDATE_COMMAND: "echo instaluji; sleep 1",
+    // The update script must not inherit the AppImage's own environment (its bundled libraries broke
+    // the system's curl in 0.8.x), so the app runs here as if inside an AppImage and the script checks.
+    ...(win ? {} : { APPDIR: "/tmp/vimmi-appimage-test", LD_LIBRARY_PATH: "/tmp/vimmi-appimage-test/usr/lib" }),
+    VIMMI_UPDATE_COMMAND: 'echo instaluji; if [ -n "$LD_LIBRARY_PATH$APPDIR" ]; then echo "AppImage environment leaked into the update" >&2; exit 1; fi; sleep 1',
     VIMMI_UPDATE_ENDPOINT: `http://127.0.0.1:${feed.address().port}/latest.json`,
     VIMMI_UPDATE_PUBKEY: fs.readFileSync(path.join(upd, "test.key.pub"), "utf8").trim(),
     VIMMI_UPDATE_EXE: installedExe,

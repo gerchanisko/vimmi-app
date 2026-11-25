@@ -2,6 +2,10 @@
 
 Poznámky, úkoly a kalendář na jednom klidném místě – s AI asistentem.
 
+### Oprava ve verzi 0.9.1
+
+Na Linuxu (instalace přes `install.sh`) se aktualizace z aplikace nepovedla: stahování spadlo a po restartu zůstala stará verze. Opraveno. Kdo má 0.8.x nebo 0.9.0 na Linuxu, aktualizuje se jednou ručně stejným příkazem jako při instalaci: `curl -fsSL https://raw.githubusercontent.com/gerchanisko/vimmi-app/main/install.sh | bash`. Další aktualizace už půjdou samy.
+
 ### Novinka ve verzi 0.9: Claude Pro / Max bez API klíče
 
 Máš předplatné Claude? V **Nastavení → AI** jedním tlačítkem připojíš Vimmi do **Claude Code** nebo **Claude Desktop** (jako MCP server). Claude pak pracuje s tvými poznámkami, úkoly a kalendářem na tvém předplatném, bez API klíče. Každá změna se ukládá do historie poznámky. AI přímo ve Vimmi funguje dál jako dřív.

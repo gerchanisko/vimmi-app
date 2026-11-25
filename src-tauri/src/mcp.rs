@@ -167,8 +167,8 @@ pub async fn mcp_add_to_claude_code() -> Result<(), String> {
     let claude = claude_code().ok_or("Claude Code se nepodařilo najít. Zkopíruj příkaz a spusť ho v terminálu.")?;
     let command = server_command()?;
     tauri::async_runtime::spawn_blocking(move || {
-        let _ = run_quiet(std::process::Command::new(&claude).args(["mcp", "remove", "--scope", "user", "vimmi"]));
-        let out = run_quiet(std::process::Command::new(&claude).args(["mcp", "add", "--scope", "user", "vimmi", "--"]).arg(&command).arg("--mcp"))
+        let _ = run_quiet(crate::host_command(&claude).args(["mcp", "remove", "--scope", "user", "vimmi"]));
+        let out = run_quiet(crate::host_command(&claude).args(["mcp", "add", "--scope", "user", "vimmi", "--"]).arg(&command).arg("--mcp"))
             .map_err(|e| format!("Claude Code se nepodařilo spustit: {e}"))?;
         if out.status.success() {
             Ok(())
